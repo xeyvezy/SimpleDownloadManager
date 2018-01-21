@@ -3,11 +3,11 @@
 A simple download manager in C++11 & QT.
 
 ## Building
-`git clone https://github.com/AshishBhattarai/SimpleDownloadManager.git`
-`cd SimpleDownloadManager`
-`rcc -binary resource/resoure.qrc -o bin/resource.rcc`
-`mkdir build && cd build`
-`cmake ../ && make`
+`git clone https://github.com/AshishBhattarai/SimpleDownloadManager.git` </br>
+`cd SimpleDownloadManager` </br>
+`rcc -binary resource/resoure.qrc -o bin/resource.rcc` </br>
+`mkdir build && cd build` </br>
+`cmake ../ && make` </br>
 
 ## License
 
