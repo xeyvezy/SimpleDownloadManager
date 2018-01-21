@@ -23,12 +23,14 @@ public:
 
 	explicit Download(uint id, QUrl url, bool newDownload, QObject* parent = 0);
 
+	void updateDownloadInfo();
 	void startDownload();
 
 private:
 	//Members
 	uint id;
 	qint64 fileSize;
+	int progress;
 	QUrl url;
 	QString fileName;
 	QFile file;
@@ -40,11 +42,22 @@ private:
 	//Methods
 	static void initNetworkAccessManager();
 	void getDownloadInfo();
+	bool fileExists(QString path);
+
+
+signals:
+	void downloadInfoComplete(QString message, bool error);
+	void fileSizeUpdate(qint64 size);
+	void progressUpdate(int percent);
 
 	//Getters
 public:
-	uint getIdt() const {
+	uint getId() const {
 		return id;
+	}
+
+	int getProgress() const {
+		return progress;
 	}
 
 	qint64 getFileSize() const {

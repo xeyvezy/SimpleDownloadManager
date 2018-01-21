@@ -1,11 +1,13 @@
-#Simple Download Manager
+# Simple Download Manager
 
 A simple download manager in C++11 & QT.
 
 ## Building
-
-mkdir build && cd build
-cmake ../ && make
+`git clone https://github.com/AshishBhattarai/SimpleDownloadManager.git`
+`cd SimpleDownloadManager`
+`rcc -binary resource/resoure.qrc -o bin/resource.rcc`
+`mkdir build && cd build`
+`cmake ../ && make`
 
 ## License
 

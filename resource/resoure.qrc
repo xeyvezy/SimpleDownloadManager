@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="icons">
+    <file>icons/MainWindow.ico</file>
     <file>icons/Pause.ico</file>
     <file>icons/delete.ico</file>
     <file>icons/play.ico</file>
