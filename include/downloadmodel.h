@@ -8,13 +8,16 @@
 class DownloadModel : public QAbstractTableModel {
 
 public:  
-	static constexpr int COL_CNT = 4;
+	static constexpr int COL_CNT = 6;
 	static const QString HEADERS[COL_CNT];
+	static const QString DEFAULT_TEXT;
 
 	enum UPDATE_FIELD {
 		PROGRESS = 0x0000,
 		SPEED = 0x0001,
-		SIZE = 0x0002
+		SIZE = 0x0002,
+		STATE = 0x003,
+		ALL = 0x0004
 	}; 
 
 	DownloadModel(QObject* parent = 0);
@@ -31,6 +34,10 @@ public:
 		int role = Qt::EditRole) override;
 	bool insertRows(int row, int count, 
 		const QModelIndex& parent = QModelIndex()) override;
+	
+	bool removeRows(int row, int count, 
+		const QModelIndex &parent = QModelIndex()) override;
+	
 	void addDownload(Download* download);
 
 	Download* getDownload(int i) const {

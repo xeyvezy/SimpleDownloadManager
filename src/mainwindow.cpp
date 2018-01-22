@@ -87,8 +87,27 @@ MainWindow::MainWindow(QWidget* parent):
 	ui->tableView->setShowGrid(false);
 	ui->tableView->setSortingEnabled(true);
 	ui->tableView->resizeColumnToContents(0);
-
+	
+	//Create a new download
 	connect(ui->actionNew, &QAction::triggered, this, &MainWindow::newDownload);
+	
+	//pause download
+	connect(ui->actionPause, &QAction::triggered, this, [&]{
+		int row = ui->tableView->currentIndex().row();
+		Download* download = model->getDownload(row);
+		Download::DownloadState state = download->getState();
+		if(state != Download::PAUSED && state != Download::COMPLETED)
+			download->pauseDownload();
+	});
+
+	//resume download
+	connect(ui->actionResume, &QAction::triggered, this, [&]{
+		int row = ui->tableView->currentIndex().row();
+		Download* download = model->getDownload(row);
+		Download::DownloadState state = download->getState();
+		if(state == Download::PAUSED && state != Download::COMPLETED)
+			download->resumeDownload();
+	});
 }          
 
 void MainWindow::newDownload() {
@@ -106,17 +125,24 @@ void MainWindow::newDownload() {
 		loop.exec();
 
 		//add new download to model
-		Download* download = new Download(model->rowCount(), url, 1, model);
+		Download* download = new Download(url, 1, model);
+		//add a new row with empty download - (to display getting info)
+		model->insertRow(model->rowCount());
+		ui->tableView->resizeColumnToContents(1);
 
 		connect(download, &Download::downloadInfoComplete, this, 
 			[=](QString message, bool error){
 			if(error) {
 				QMessageBox::warning(this, "Error!", message);
 				download->deleteLater();
+				//remove newly added row on error
+				model->removeRow(model->rowCount()-1);
 				return;
 			} 
 			
+			//update the empty download with new download
 			model->addDownload(download);
+			updateModel(download, DownloadModel::ALL);
 
 			//updating progressbar
 			connect(download, &Download::progressUpdate, this, [=]{
@@ -125,6 +151,16 @@ void MainWindow::newDownload() {
 			//update size if updateDownloadInfo fails
 			connect(download, &Download::fileSizeUpdate, this, [=]{
 				updateModel(download, DownloadModel::SIZE);
+			});
+			//update download state
+			connect(download, &Download::stateChanged, this, [=]{
+				updateModel(download, DownloadModel::STATE);
+			});
+			//errors while downloading
+			connect(download, &Download::downloadError, this, 
+				[=](QString message){
+				download->pauseDownload();
+				QMessageBox::warning(this, "Error!", message);
 			});
 			 
 		});

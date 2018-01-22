@@ -2,9 +2,11 @@
 #include <algorithm>
 #include <QMessageBox>
  
-const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress", "Size"}; 
+const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress", 
+	"Speed", "Size", "State"}; 
+const QString DownloadModel::DEFAULT_TEXT = "Getting Download Info....";
 
-DownloadModel::DownloadModel(QObject* parent):
+DownloadModel::DownloadModel(QObject* parent): 
 	QAbstractTableModel(parent), downloadCount(0) {
 	  
 }
@@ -23,17 +25,23 @@ QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 		return int(Qt::AlignVCenter|Qt::AlignRight); 
 	else if(role == Qt::DisplayRole) {
 		Download* download = downloads.at(index.row());
-		if(!download) return QVariant();
-		switch(index.column()) {
-			case 0:
-				return QVariant(download->getId()+1);
-			case 1:
-				return QVariant(download->getFileName());
-			case 2:
-				return QVariant(download->getProgress()); 
-			case 3:
-				return QVariant(download->getFileSize());
-		} 
+		if(!download) { //Display getting info if download in nullptr
+			if(index.column() == 1)
+				return QVariant(DEFAULT_TEXT); 
+		} else {
+			switch(index.column()) {
+				case 0:
+					return QVariant(index.row()+1);
+				case 1:
+					return QVariant(download->getFileName());
+				case 2:
+					return QVariant(download->getProgress()); 
+				case 4:
+					return QVariant(download->getFileSizeString());
+				case 5:
+					return QVariant(download->getStateString());
+			}
+		}		 
 	}
 	return QVariant();
 } 
@@ -53,6 +61,10 @@ QVariant DownloadModel::headerData(int section, Qt::Orientation orientation,
 			return QVariant(HEADERS[2]);
 		case 3:
 			return QVariant(HEADERS[3]);
+		case 4:
+			return QVariant(HEADERS[4]);
+		case 5:
+			return QVariant(HEADERS[5]);
 	}
 	return QVariant();
 }
@@ -69,46 +81,62 @@ bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 
 	int cond = value.toInt();
 
+	QModelIndex index1;
 	QModelIndex index2;
 
 	switch(cond) {
 		case PROGRESS:
 			index2 = QAbstractItemModel::createIndex(index.row(), 2);
+			index1 = index2;
 			break;
 		case SIZE:
+			index2 = QAbstractItemModel::createIndex(index.row(), 4);
+			index1 = index2;
+			break;
+		case STATE:
+			index2 = QAbstractItemModel::createIndex(index.row(), 5);
+			index1 = index2;
+			break;
+		case ALL:
 			index2 = QAbstractItemModel::createIndex(index.row(), 3);
+			index1 = QAbstractItemModel::createIndex(index.row(), 0);
 			break;
 	}
  
-	if(index2.isValid()) {  
-		emit dataChanged(index2, index2);
-		return 1;
-	} 
-
-	return 0;
+	emit dataChanged(index1, index2);
+	return 1;
 }
 
 void DownloadModel::sort(int column, Qt::SortOrder order) {
-	//sort by id only for now
-	if(column != 0) return;
-	std::sort(downloads.begin(), downloads.end(), 
-		[&](const Download* a, const Download* b)->bool {
-		
-		if(order & Qt::SortOrder::DescendingOrder) return a->getId() > b->getId();
-		else return a->getId() < b->getId();
-	});
+	
+	// if(column == 0) return;
+	
+	//TODO: sorting
+
 	//update the whole view 
-	emit layoutChanged();
+	// emit layoutChanged();
 } 
 
 bool DownloadModel::insertRows(int row, int count, const QModelIndex& parent) {
 	beginInsertRows(parent, row, row+(count-1));
 	endInsertRows();
+	Download* download = Q_NULLPTR;
+	downloads.append(download);
+	downloadCount++;
+	return true;
+}
+
+bool DownloadModel::removeRows(int row, int count, const QModelIndex &parent) {
+	if(row < downloadCount) return false;
+	
+	beginRemoveRows(parent, row, row+(count-1));
+	endRemoveRows();
+	downloads.removeAt(row);
+	downloadCount--;
 	return true;
 }
 
 void DownloadModel::addDownload(Download* download) {
 
-	downloads.append(download);
-	insertRow(downloadCount++);
+	downloads[downloadCount-1] = download;
 } 

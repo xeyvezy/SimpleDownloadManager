@@ -18,19 +18,22 @@ public:
 		NOTHING = 0x0000,
 		DOWNLOADING = 0x0001,
 		PAUSED = 0x0002,
-		COMPLETED = 0x0003
+		COMPLETED = 0x0003,
+		FAILED = 0x0004
 	};
 
-	explicit Download(uint id, QUrl url, bool newDownload, QObject* parent = 0);
+	explicit Download(QUrl url, bool newDownload, QObject* parent = 0);
 
 	void updateDownloadInfo();
 	void startDownload();
+	void pauseDownload();
+	void resumeDownload();
 
 private:
 	//Members
-	uint id;
-	qint64 fileSize;
 	int progress;
+	qint64 fileSize;
+	qint64 sizeAtPause;
 	QUrl url;
 	QString fileName;
 	QFile file;
@@ -43,19 +46,20 @@ private:
 	static void initNetworkAccessManager();
 	void getDownloadInfo();
 	bool fileExists(QString path);
+	void emitStateChanged() {
+		emit stateChanged(state);
+	}
 
 
 signals:
+	void downloadError(QString message);
 	void downloadInfoComplete(QString message, bool error);
 	void fileSizeUpdate(qint64 size);
 	void progressUpdate(int percent);
+	void stateChanged(DownloadState state);
 
 	//Getters
 public:
-	uint getId() const {
-		return id;
-	}
-
 	int getProgress() const {
 		return progress;
 	}
@@ -75,5 +79,22 @@ public:
 	DownloadState getState() const {
 		return state;
 	}
+
+	QString getStateString() const {
+		switch(state) {
+			case DOWNLOADING:
+				return QString("DOWNLOADING");
+			case COMPLETED:
+				return QString("COMPLETED");
+			case PAUSED:
+				return QString("PAUSED");
+			case FAILED:
+				return QString("FAILED");
+			default:
+				return QString("NOTHING");
+		}
+	}
+
+	QString getFileSizeString() const;
 
 };

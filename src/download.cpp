@@ -4,16 +4,18 @@
 
 QNetworkAccessManager* Download::manager = Q_NULLPTR;
 
-Download::Download(uint id, QUrl url, bool newDownload, QObject* parent): 
+Download::Download(QUrl url, bool newDownload, QObject* parent): 
 	QObject(parent) {
 	
 	if(manager == Q_NULLPTR) {
 		Download::initNetworkAccessManager();
 	}
-	this->id = id;
 	this->url = url;
 	this->progress = 0;
 	this->fileSize = -1;
+	this->sizeAtPause = 0;
+	this->fileName = url.fileName();
+	this->state = NOTHING;
 	this->reply = Q_NULLPTR;
 	this->request = QNetworkRequest(this->url);
 	//Redirect
@@ -39,15 +41,22 @@ void Download::updateDownloadInfo() {
 	this->file.setFileName(fileName);
 }
 
+bool Download::fileExists(QString path) {
+	QFileInfo check(path);
+	return check.exists() && check.isFile();
+}
+
 void Download::startDownload() { 
-
-	qDebug() << "Starting Download..." << endl;
-
-	if(!file.open(QIODevice::WriteOnly)) {
+  	
+	if(!file.open(QIODevice::WriteOnly|QIODevice::Append)) {
 		qDebug() << "Error: " << file.errorString();
+		emit downloadError(file.errorString());
 		return;
 	}
+	
+	qDebug() << "Starting Download..." << endl;
 	state = DOWNLOADING;
+	emitStateChanged();
 	reply = manager->get(request);
 
 	//Write downloaded portion while downloading
@@ -63,7 +72,8 @@ void Download::startDownload() {
 			emit fileSizeUpdate(fileSize);
 		}
 		if(bytesReceived > 0) {
-			progress = (bytesReceived*100)/bytesTotal;
+			progress = ((bytesReceived+sizeAtPause)*100) /
+				(bytesTotal+sizeAtPause);
 			emit progressUpdate(progress);
 		}
 	});
@@ -71,20 +81,43 @@ void Download::startDownload() {
 	//Download finisehd
 	connect(reply, &QNetworkReply::finished, this, [&]{
 		if(reply->error()) {
-			qDebug() << "Error: " << reply->errorString();
+			if(reply->error() != QNetworkReply::OperationCanceledError) {
+				qDebug() << "Error: " << reply->errorString();
+				emit downloadError(reply->errorString());
+				state = FAILED;
+				emitStateChanged();
+			}
 		} else {
 			qDebug() << "Finished downloading " << fileName << endl;
+			state = COMPLETED;
+			emitStateChanged();
 		}
 
-		file.close();
+		file.close(); 
 		reply->deleteLater();
 		reply = Q_NULLPTR;
 	});
 }
 
-bool Download::fileExists(QString path) {
-	QFileInfo check(path);
-	return check.exists() && check.isFile();
+void Download::pauseDownload() {
+	if(!reply)
+		return;
+	qDebug() << "Download Paused" << endl;
+	state = PAUSED;
+	emitStateChanged();
+	reply->abort();
+	reply = Q_NULLPTR;
+}
+
+void Download::resumeDownload() {
+	if(file.size() > 0) {
+		qDebug() << "Download Resumed" << endl;
+		sizeAtPause = file.size();
+		QByteArray rangeHeader = "bytes="+QByteArray::number(sizeAtPause)+"-";
+		request.setRawHeader(QByteArray("Range"), rangeHeader);
+	}
+
+	startDownload();
 }
 
 /**
@@ -94,19 +127,17 @@ bool Download::fileExists(QString path) {
  */
 void Download::getDownloadInfo() { 
 	reply = manager->get(request);
-	connect(reply, &QNetworkReply::readyRead, this, [&]{	
-		QString size = reply->rawHeader("Content-Length");
-		if(!size.isEmpty())
-			fileSize = size.toInt();
-		fileName = reply->rawHeader("Content-Disposition");
-		if(fileName.isEmpty()) {
-			qDebug() << "Couldn't get the file name from header."
-						<< "Using url file name." << endl;
-			fileName = url.fileName();
-		} else {
-			int x = fileName.indexOf('=');
-			fileName = fileName.mid(x+1, fileName.length());
+	connect(reply, &QNetworkReply::readyRead, this, [&]{		
+		QString data = reply->rawHeader("Content-Length");
+		if(!data.isEmpty())
+			fileSize = data.toInt();
+		
+		data = reply->rawHeader("Content-Disposition");
+		if(!data.isEmpty()) {
+			int x = data.indexOf('=');
+			fileName = data.mid(x+1, data.length());
 		} 
+
 		reply->abort();
 		reply->deleteLater();
 		reply = Q_NULLPTR;
@@ -125,4 +156,30 @@ void Download::getDownloadInfo() {
 		 	emit downloadInfoComplete(reply->errorString(), 0);
 	});
 	loop.exec(); 
+}
+
+QString Download::getFileSizeString() const {
+ 
+		if(!fileSize) return QString();
+		int i = 0;
+		float size = fileSize;
+
+		while(size>1) {
+			if(i==5) break;
+			size/=1024;
+			++i;
+		}
+		size *= 1024;
+		switch(i) {
+			case 1:
+				return QString::number(size)+"B";
+			case 2:
+				return QString::number(size)+"KB";
+			case 3:
+				return QString::number(size)+"MB";
+			case 4:
+				return QString::number(size)+"GB";
+			default:
+				return QString::number(size)+"TB";
+		}
 }
