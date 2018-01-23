@@ -27,25 +27,6 @@ void Download::initNetworkAccessManager() {
 	Download::manager = new QNetworkAccessManager();
 } 
 
-void Download::updateDownloadInfo() {
-	//set fileName&fileSize
-	getDownloadInfo();
-	if(fileExists(fileName)) {
-		int i = 1;
-		while(fileExists(QString::number(i)+"-"+fileName)) {
-			++i;
-		}
-		fileName = QString::number(i)+"-"+fileName;
-	}
-	
-	this->file.setFileName(fileName);
-}
-
-bool Download::fileExists(QString path) {
-	QFileInfo check(path);
-	return check.exists() && check.isFile();
-}
-
 void Download::startDownload() { 
   	
 	if(!file.open(QIODevice::WriteOnly|QIODevice::Append)) {
@@ -69,12 +50,16 @@ void Download::startDownload() {
 		(qint64 bytesReceived, qint64 bytesTotal) {
 		if(bytesTotal > 0 && fileSize < 0) {
 			fileSize = bytesTotal;
+			setFileSizeString();
 			emit fileSizeUpdate(fileSize);
 		}
 		if(bytesReceived > 0) {
-			progress = ((bytesReceived+sizeAtPause)*100) /
+			int curProgress = ((bytesReceived+sizeAtPause)*100) /
 				(bytesTotal+sizeAtPause);
-			emit progressUpdate(progress);
+			if((curProgress-progress) > 0) {
+				progress = curProgress;
+				emit progressUpdate(progress);
+			}
 		}
 	});
 
@@ -131,7 +116,7 @@ void Download::getDownloadInfo() {
 		QString data = reply->rawHeader("Content-Length");
 		if(!data.isEmpty())
 			fileSize = data.toInt();
-		
+		setFileSizeString();
 		data = reply->rawHeader("Content-Disposition");
 		if(!data.isEmpty()) {
 			int x = data.indexOf('=');
@@ -143,43 +128,65 @@ void Download::getDownloadInfo() {
 		reply = Q_NULLPTR;
 	});
 
-	//wait for reply to finish 
-	QEventLoop loop;
-	connect(reply, &QNetworkReply::finished, &loop, [&]{
-		loop.exit();
-		
+	//wait for reply to finish
+	connect(reply, &QNetworkReply::finished, this, [&]{
 		if(reply->error() == reply->ProtocolUnknownError) 
 			emit downloadInfoComplete("Invalid Downlaod URL!", reply->error());
 		else if(reply->error() != reply->OperationCanceledError)
 			emit downloadInfoComplete(reply->errorString(), reply->error());
-		else 
-		 	emit downloadInfoComplete(reply->errorString(), 0);
+		else {
+			updateDownloadInfo();
+			emit downloadInfoComplete(reply->errorString(), 0);
+		}
 	});
-	loop.exec(); 
 }
 
-QString Download::getFileSizeString() const {
- 
-		if(!fileSize) return QString();
-		int i = 0;
-		float size = fileSize;
+void Download::updateDownloadInfo() {
+	//set fileName&fileSize
 
-		while(size>1) {
-			if(i==5) break;
-			size/=1024;
+	if(fileExists(fileName)) {
+		int i = 1;
+		while(fileExists(QString::number(i)+"-"+fileName)) {
 			++i;
 		}
-		size *= 1024;
-		switch(i) {
-			case 1:
-				return QString::number(size)+"B";
-			case 2:
-				return QString::number(size)+"KB";
-			case 3:
-				return QString::number(size)+"MB";
-			case 4:
-				return QString::number(size)+"GB";
-			default:
-				return QString::number(size)+"TB";
-		}
+		fileName = QString::number(i)+"-"+fileName;
+	}
+	this->file.setFileName(fileName);
+}
+
+bool Download::fileExists(QString path) {
+	QFileInfo check(path);
+	return check.exists() && check.isFile();
+}
+
+void Download::setFileSizeString() { 
+ 	if(fileSize < 0) { 
+		 fileSizeString = QString("UN"); //unknown
+		 return; 
+	 }
+	int i = 0;
+	float size = fileSize;
+
+	while(size>1) {
+		if(i==5) break;
+		size/=1024;
+		++i;
+	}
+	size *= 1024;
+	switch(i) {
+		case 1:
+			fileSizeString = QString::number(size)+"B";
+			break;
+		case 2:
+			fileSizeString =  QString::number(size)+"KB";
+			break;
+		case 3:
+			fileSizeString =  QString::number(size)+"MB";
+			break;
+		case 4:
+			fileSizeString =  QString::number(size)+"GB";
+			break;
+		default:
+			fileSizeString =  QString::number(size)+"TB";
+	}
 }

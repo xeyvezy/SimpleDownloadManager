@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QMessageBox> 
 #include <QDebug>
+#include <QCheckBox>
 #include <QDesktopServices> 
 
 class TableDelegate : public QItemDelegate {
@@ -92,8 +93,9 @@ MainWindow::MainWindow(QWidget* parent):
 	connect(ui->actionNew, &QAction::triggered, this, &MainWindow::newDownload);
 	
 	//pause download
-	connect(ui->actionPause, &QAction::triggered, this, [&]{
+	connect(ui->actionPause, &QAction::triggered, this, [this]{
 		int row = ui->tableView->currentIndex().row();
+		if(row == -1) return;
 		Download* download = model->getDownload(row);
 		Download::DownloadState state = download->getState();
 		if(state != Download::PAUSED && state != Download::COMPLETED)
@@ -101,37 +103,65 @@ MainWindow::MainWindow(QWidget* parent):
 	});
 
 	//resume download
-	connect(ui->actionResume, &QAction::triggered, this, [&]{
+	connect(ui->actionResume, &QAction::triggered, this, [this]{
 		int row = ui->tableView->currentIndex().row();
+		if(row == -1) return;
 		Download* download = model->getDownload(row);
 		Download::DownloadState state = download->getState();
 		if(state == Download::PAUSED && state != Download::COMPLETED)
 			download->resumeDownload();
 	});
-}          
+
+	//delete download
+	//If the download is incomplete the file is deleted 
+	//else the user gets option to delete it
+	connect(ui->actionDelete, &QAction::triggered, this, [this]{
+		int row = ui->tableView->currentIndex().row(); 
+		if(row == -1) return;
+		Download* download = model->getDownload(row);
+		Download::DownloadState state = download->getState();
+		
+		QMessageBox msgBox(this); 
+		QCheckBox cbox;  
+		if(state == Download::COMPLETED) { 
+			cbox.setText("Delete the downloaded file.");		
+			msgBox.setCheckBox(&cbox); 
+			cbox.setFocusPolicy(Qt::FocusPolicy::NoFocus);
+		}
+		msgBox.setText("Do you really want to delete the download?");
+		msgBox.setStandardButtons(QMessageBox::Yes|QMessageBox::No);	
+		msgBox.setIcon(QMessageBox::Question);
+		int selection =	msgBox.exec();
+		if(selection == QMessageBox::Yes) {
+			download->pauseDownload();
+			model->removeRow(row);
+			download->deleteLater();
+			if(state == Download::COMPLETED) 
+				if(!cbox.isChecked()) return;
+			QFile file(download->getFileName());
+			if(file.exists())
+				file.remove();
+		}
+	});
+}         
 
 void MainWindow::newDownload() {
-
-		QUrl url;
-		InputDialog* dialog = new InputDialog("New Download", 
-			"Enter Download URL: ", this);
+	InputDialog* dialog = new InputDialog("New Download", 
+		"Enter Download URL: ", this);
 		
-		dialog->show();
-		QEventLoop loop;
-		connect(dialog, &QDialog::accepted, this, [&]{
-			url = dialog->getVal();
-			loop.exit();
-		});
-		loop.exec();
-
+	dialog->show();
+	connect(dialog, &QDialog::accepted, this, [=]{
+		QUrl url = dialog->getVal();
 		//add new download to model
 		Download* download = new Download(url, 1, model);
 		//add a new row with empty download - (to display getting info)
 		model->insertRow(model->rowCount());
 		ui->tableView->resizeColumnToContents(1);
 
+		bool start = 1;
+		QEventLoop loop;
 		connect(download, &Download::downloadInfoComplete, this, 
-			[=](QString message, bool error){
+			[=,&loop,&start](QString message, bool error){
 			if(error) {
 				QMessageBox::warning(this, "Error!", message);
 				download->deleteLater();
@@ -162,15 +192,21 @@ void MainWindow::newDownload() {
 				download->pauseDownload();
 				QMessageBox::warning(this, "Error!", message);
 			});
-			 
+			start = 0;
+			loop.exit();
 		});
+		
+		download->getDownloadInfo(); 
+		loop.exec();
+		//Don't start download till downloadInfoComplete slot is finished
+		//Don't start download on error
+		if(!start) download->startDownload(); 
 
-		download->updateDownloadInfo(); 
-		download->startDownload();
-
+		
 		ui->tableView->resizeColumnToContents(1);
 		ui->tableView->resizeColumnToContents(2);
 		ui->tableView->resizeColumnToContents(3);
+	});
 }
  
 bool MainWindow::updateModel(Download* download, 

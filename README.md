@@ -3,8 +3,8 @@
 A simple download manager in C++11 & QT.
 
 ## Dependencies
-** QT5
-** C++11
+* QT5
+* C++11
 
 ## Building
 1. `git clone https://github.com/AshishBhattarai/SimpleDownloadManager.git` </br>

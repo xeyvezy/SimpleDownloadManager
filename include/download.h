@@ -24,7 +24,7 @@ public:
 
 	explicit Download(QUrl url, bool newDownload, QObject* parent = 0);
 
-	void updateDownloadInfo();
+	void getDownloadInfo();
 	void startDownload();
 	void pauseDownload();
 	void resumeDownload();
@@ -36,6 +36,7 @@ private:
 	qint64 sizeAtPause;
 	QUrl url;
 	QString fileName;
+	QString fileSizeString;
 	QFile file;
 	DownloadState state;
 	QNetworkReply* reply;
@@ -44,11 +45,12 @@ private:
 	
 	//Methods
 	static void initNetworkAccessManager();
-	void getDownloadInfo();
 	bool fileExists(QString path);
+	void updateDownloadInfo();
 	void emitStateChanged() {
 		emit stateChanged(state);
 	}
+	void setFileSizeString();
 
 
 signals:
@@ -95,6 +97,7 @@ public:
 		}
 	}
 
-	QString getFileSizeString() const;
-
+	QString getFileSizeString() const {
+		return fileSizeString;
+	}
 };

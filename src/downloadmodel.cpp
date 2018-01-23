@@ -127,7 +127,7 @@ bool DownloadModel::insertRows(int row, int count, const QModelIndex& parent) {
 }
 
 bool DownloadModel::removeRows(int row, int count, const QModelIndex &parent) {
-	if(row < downloadCount) return false;
+	if(row > downloadCount) return false;
 	
 	beginRemoveRows(parent, row, row+(count-1));
 	endRemoveRows();
