@@ -28,7 +28,11 @@ Download::Download(QUrl url, bool newDownload, QObject* parent):
 
 void Download::initNetworkAccessManager() {
 	Download::manager = new QNetworkAccessManager();
-} 
+}
+
+void Download::deleteManager() {
+	delete manager;
+}
 
 void Download::startDownload() { 
   	

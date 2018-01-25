@@ -29,6 +29,7 @@ public:
 	void startDownload();
 	void pauseDownload();
 	void resumeDownload();
+	static void deleteManager();
 
 private:
 	//Members

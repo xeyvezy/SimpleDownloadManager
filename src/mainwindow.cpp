@@ -64,6 +64,10 @@ public:
 		return ui->lineEdit->text();
 	}
 
+	~InputDialog() {
+		delete ui;
+	}
+
 private:
 	Ui::Dialog* ui;
 
@@ -134,6 +138,11 @@ MainWindow::MainWindow(QWidget* parent):
 	//else the user gets option to delete it
 	connect(ui->actionDelete, &QAction::triggered, this, 
 		&MainWindow::deleteDownload);
+}
+
+MainWindow::~MainWindow() {
+	delete ui;
+	Download::deleteManager();
 }         
 
 void MainWindow::setupTableView() {
