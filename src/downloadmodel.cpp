@@ -3,7 +3,7 @@
 #include <QMessageBox>
  
 const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress", 
-	"Speed", "Size", "State"}; 
+	"Speed/s", "Size", "State"}; 
 const QString DownloadModel::DEFAULT_TEXT = "Getting Download Info....";
 
 DownloadModel::DownloadModel(QObject* parent): 
@@ -36,6 +36,8 @@ QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 					return QVariant(download->getFileName());
 				case 2:
 					return QVariant(download->getProgress()); 
+				case 3:
+					return QVariant(download->getSpeedString());
 				case 4:
 					return QVariant(download->getFileSizeString());
 				case 5:
@@ -89,6 +91,10 @@ bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 			index2 = QAbstractItemModel::createIndex(index.row(), 2);
 			index1 = index2;
 			break;
+		case SPEED:
+			index2 = QAbstractItemModel::createIndex(index.row(), 3);
+			index1 = index2;
+			break;
 		case SIZE:
 			index2 = QAbstractItemModel::createIndex(index.row(), 4);
 			index1 = index2;
@@ -106,16 +112,6 @@ bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 	emit dataChanged(index1, index2);
 	return 1;
 }
-
-void DownloadModel::sort(int column, Qt::SortOrder order) {
-	
-	// if(column == 0) return;
-	
-	//TODO: sorting
-
-	//update the whole view 
-	// emit layoutChanged();
-} 
 
 bool DownloadModel::insertRows(int row, int count, const QModelIndex& parent) {
 	beginInsertRows(parent, row, row+(count-1));

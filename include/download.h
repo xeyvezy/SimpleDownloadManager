@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QEventLoop>
 #include <QApplication> 
+#include <QElapsedTimer>
 #include <QStorageInfo>
 
 class Download : public QObject {
@@ -32,11 +33,15 @@ public:
 private:
 	//Members
 	int progress;
+	int speed;
+	qint64 lastReceived;
 	qint64 fileSize;
 	qint64 sizeAtPause;
 	QUrl url;
+	QElapsedTimer stime;
 	QString fileName;
 	QString fileSizeString;
+	QString speedString;
 	QFile file;
 	DownloadState state;
 	QNetworkReply* reply;
@@ -50,7 +55,7 @@ private:
 	void emitStateChanged() {
 		emit stateChanged(state);
 	}
-	void setFileSizeString();
+	QString convertSizeTString(qint64 size);
 
 
 signals:
@@ -59,6 +64,7 @@ signals:
 	void fileSizeUpdate(qint64 size);
 	void progressUpdate(int percent);
 	void stateChanged(DownloadState state);
+	void downloadSpeed(int speed);
 
 	//Getters
 public:
@@ -100,4 +106,8 @@ public:
 	QString getFileSizeString() const {
 		return fileSizeString;
 	}
-};
+
+	QString getSpeedString() const {
+		return speedString;
+	}
+}; 

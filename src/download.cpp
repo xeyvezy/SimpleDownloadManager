@@ -12,12 +12,15 @@ Download::Download(QUrl url, bool newDownload, QObject* parent):
 	}
 	this->url = url;
 	this->progress = 0;
+	this->speed = 0;
+	this->lastReceived = 0;
 	this->fileSize = -1;
 	this->sizeAtPause = 0;
 	this->fileName = url.fileName();
 	this->state = NOTHING;
 	this->reply = Q_NULLPTR;
 	this->request = QNetworkRequest(this->url);
+	this->stime.start();
 	//Redirect
 	request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, 
 		QVariant("MyRequest")); 
@@ -50,7 +53,7 @@ void Download::startDownload() {
 		(qint64 bytesReceived, qint64 bytesTotal) {
 		if(bytesTotal > 0 && fileSize < 0) {
 			fileSize = bytesTotal;
-			setFileSizeString();
+			fileSizeString = convertSizeTString(fileSize);
 			emit fileSizeUpdate(fileSize);
 		}
 		if(bytesReceived > 0) {
@@ -59,6 +62,13 @@ void Download::startDownload() {
 			if((curProgress-progress) > 0) {
 				progress = curProgress;
 				emit progressUpdate(progress);
+			}
+			if(stime.elapsed() > 1000) {
+				speed = bytesReceived - lastReceived;
+				lastReceived = bytesReceived;
+				speedString = convertSizeTString(speed);
+				emit downloadSpeed(speed); 
+				stime.restart();
 			}
 		}
 	});
@@ -77,6 +87,9 @@ void Download::startDownload() {
 			state = COMPLETED;
 			emitStateChanged();
 		}
+		
+		speedString = "";
+		emit downloadSpeed(0);
 
 		file.close(); 
 		reply->deleteLater();
@@ -116,7 +129,7 @@ void Download::getDownloadInfo() {
 		QString data = reply->rawHeader("Content-Length");
 		if(!data.isEmpty())
 			fileSize = data.toInt();
-		setFileSizeString();
+		fileSizeString = convertSizeTString(fileSize);
 		data = reply->rawHeader("Content-Disposition");
 		if(!data.isEmpty()) {
 			int x = data.indexOf('=');
@@ -159,34 +172,30 @@ bool Download::fileExists(QString path) {
 	return check.exists() && check.isFile();
 }
 
-void Download::setFileSizeString() { 
- 	if(fileSize < 0) { 
-		 fileSizeString = QString("UN"); //unknown
-		 return; 
+QString Download::convertSizeTString(qint64 size) { 
+ 	if(size < 0) { 
+		 return QString("UN"); //unknown
 	 }
 	int i = 0;
-	float size = fileSize;
 
-	while(size>1) {
+	float fsize = size;
+
+	while(fsize>1) {
 		if(i==5) break;
-		size/=1024;
+		fsize/=1024;
 		++i;
 	}
-	size *= 1024;
+	fsize *= 1024;
 	switch(i) {
 		case 1:
-			fileSizeString = QString::number(size)+"B";
-			break;
+			return QString::number(fsize,'f',2)+"B";
 		case 2:
-			fileSizeString =  QString::number(size)+"KB";
-			break;
+			return QString::number(fsize,'f',2)+"KB";
 		case 3:
-			fileSizeString =  QString::number(size)+"MB";
-			break;
+			return QString::number(fsize,'f',2)+"MB";
 		case 4:
-			fileSizeString =  QString::number(size)+"GB";
-			break;
+			return QString::number(fsize,'f',2)+"GB";
 		default:
-			fileSizeString =  QString::number(size)+"TB";
+			return QString::number(fsize,'f',2)+"TB";
 	}
 }
