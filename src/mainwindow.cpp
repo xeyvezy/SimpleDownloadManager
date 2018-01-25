@@ -34,16 +34,20 @@ class TableDelegate : public QItemDelegate {
 			progressbar.palette = option2.palette;
 
 			//highlight on slection
-			if(progressbar.state & QStyle::State_Selected)
-				painter->fillRect(progressbar.rect, option2.palette.highlight());
-			
-
+			if(progressbar.state & QStyle::State_Selected) {
+				if(progressbar.state & QStyle::State_Active)
+					painter->fillRect(progressbar.rect, option2.palette.highlight());
+				else {
+					painter->fillRect(progressbar.rect, 
+						option2.palette.brush(QPalette::Inactive, QPalette::Highlight));
+				}
+			}
 			//set progressbar value & text
-			progressbar.progress = index.data().toInt();
+			progressbar.progress = index.data().toInt(); 
 			progressbar.text = index.data().toString()+"%";
-
+ 
 			//draw
-			qApp->style()->drawControl(QStyle::CE_ProgressBar, 
+			qApp->style()->drawControl(QStyle::CE_ProgressBar,  
 				&progressbar, painter);
 		}
 };
@@ -79,7 +83,7 @@ MainWindow::MainWindow(QWidget* parent):
 	QResource::registerResource("resource.rcc");
 	ui->setupUi(this);
 
-	model = new DownloadModel(this); 
+	model = new DownloadModel(this);  
 	pmodel = new QSortFilterProxyModel(this);
 	pmodel->setSourceModel(model);
 	pmodel->setFilterKeyColumn(5); 
