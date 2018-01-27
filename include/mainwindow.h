@@ -20,6 +20,8 @@ private:
 		DownloadModel::UPDATE_FIELD field) const;
 	void setupTableView();
 	void setupListView();
+	void saveState();
+	void restoreState();
 
 private slots:
 	//New Action

@@ -6,7 +6,9 @@
 #include <QMessageBox> 
 #include <QDebug>
 #include <QCheckBox>
-#include <QDesktopServices> 
+#include <QDesktopServices>
+#include <QDesktopWidget>
+#include <QSettings>
 
 class TableDelegate : public QItemDelegate {
 	public:
@@ -90,6 +92,8 @@ MainWindow::MainWindow(QWidget* parent):
 
 	setupTableView();
 	setupListView();
+	//Restore previous window state
+	restoreState();
 
 	//Filter Downloads with listview
 	connect(ui->listView, &QListView::clicked, this, [this]{
@@ -145,6 +149,8 @@ MainWindow::MainWindow(QWidget* parent):
 }
 
 MainWindow::~MainWindow() {
+	//save window state before exit
+	saveState();
 	delete ui;
 	Download::deleteManager();
 }         
@@ -185,7 +191,6 @@ void MainWindow::newDownload() {
 		Download* download = new Download(url, 1, model);
 		//add a new row with empty download - (to display getting info)
 		model->insertRow(model->rowCount());
-		ui->tableView->resizeColumnToContents(1);
 
 		bool start = 1;
 		QEventLoop loop;
@@ -234,11 +239,6 @@ void MainWindow::newDownload() {
 		//Don't start download till downloadInfoComplete slot is finished
 		//Don't start download on error
 		if(!start) download->startDownload(); 
-
-		
-		ui->tableView->resizeColumnToContents(1);
-		ui->tableView->resizeColumnToContents(2);
-		ui->tableView->resizeColumnToContents(3);
 	});
 }
 
@@ -278,3 +278,36 @@ bool MainWindow::updateModel(Download* download,
 	QModelIndex index = model->index(row, 0);
 	model->setData(index, QVariant(field));
 } 
+
+void MainWindow::saveState() {
+	QSettings settings(QSettings::IniFormat, QSettings::UserScope, 
+		"AB", "Simple Download Manager"); 
+	QByteArray table_state = ui->tableView->horizontalHeader()->saveState();
+	QByteArray msplitter_state = ui->splitter_2->saveState();
+	QByteArray ssplitter_state = ui->splitter->saveState();
+
+	settings.beginGroup("MainWindow");
+	settings.setValue("size", size());
+	settings.setValue("pos", pos());
+	settings.setValue("table_state", table_state);
+	settings.setValue("msplitter_state", msplitter_state);
+	settings.setValue("ssplitter_state", ssplitter_state);
+	settings.endGroup();
+}
+
+void MainWindow::restoreState() {
+	QSettings settings(QSettings::IniFormat, QSettings::UserScope, 
+		"AB", "Simple Download Manager"); 
+	settings.beginGroup("MainWindow");
+	//key, default data
+	resize(settings.value("size", QSize(800, 400)).toSize());
+	move(settings.value("pos", QPoint(200, 200)).toPoint());
+	
+	ui->tableView->horizontalHeader()->restoreState(settings.value("table_state").toByteArray());
+	ui->splitter_2->restoreState(settings.value("msplitter_state").toByteArray());
+	ui->splitter->restoreState(settings.value("ssplitter_state").toByteArray());
+
+	settings.endGroup();
+}
+
+ 
