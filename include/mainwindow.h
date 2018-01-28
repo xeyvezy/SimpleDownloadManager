@@ -2,6 +2,8 @@
 #include "downloadmodel.h" 
 #include <QResource>
 #include <QSortFilterProxyModel>
+#include <QMessageBox>
+#include <QSettings>
 #include <QStandardItemModel> 
  
 class MainWindow : public QMainWindow {

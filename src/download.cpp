@@ -26,6 +26,14 @@ Download::Download(QUrl url, bool newDownload, QObject* parent):
 		QVariant("MyRequest")); 
 } 
 
+Download::~Download() {
+	#ifdef DEBUG
+		qDebug() << "Download Destroyed: " << fileName << endl;
+	#endif
+	if(this->reply)
+		this->reply->abort();
+}
+
 void Download::initNetworkAccessManager() {
 	Download::manager = new QNetworkAccessManager();
 }
@@ -42,7 +50,9 @@ void Download::startDownload() {
 		return;
 	}
 	
-	qDebug() << "Starting Download..." << endl;
+	#ifdef DEBUG
+		qDebug() << "Starting Download: " <<  fileName << endl;
+	#endif
 	state = DOWNLOADING;
 	emitStateChanged();
 	reply = manager->get(request);
@@ -74,6 +84,12 @@ void Download::startDownload() {
 				emit downloadSpeed(speed); 
 				stime.restart();
 			}
+			// #ifdef DEBUG
+			// 	qDebug() << "Progress: " << progress << endl
+			// 		<< "Speed: " << speed << endl
+			// 		<< "BRecv/BTot: " << bytesReceived << "/" << bytesTotal
+			// 		<< endl;
+			// #endif
 		}
 	});
 
@@ -87,7 +103,9 @@ void Download::startDownload() {
 				emitStateChanged();
 			}
 		} else {
-			qDebug() << "Finished downloading " << fileName << endl;
+			#ifdef DEBUG
+				qDebug() << "Finished downloading " << fileName << endl;
+			#endif
 			state = COMPLETED;
 			emitStateChanged();
 		}
@@ -102,9 +120,11 @@ void Download::startDownload() {
 }
 
 void Download::pauseDownload() {
-	if(!reply)
-		return;
-	qDebug() << "Download Paused" << endl;
+	if(!reply) return;
+	#ifdef DEBUG
+		qDebug() << "Download Paused" << fileName << endl
+		 	<< "Size on disk: " << file.size() << endl;
+	#endif
 	state = PAUSED;
 	emitStateChanged();
 	reply->abort();
@@ -113,7 +133,10 @@ void Download::pauseDownload() {
 
 void Download::resumeDownload() {
 	if(file.size() > 0) {
-		qDebug() << "Download Resumed" << endl;
+		#ifdef DEBUG
+			qDebug() << "Download Resumed" << endl
+				<< "Size on disk: " << file.size() << endl;
+		#endif
 		sizeAtPause = file.size();
 		QByteArray rangeHeader = "bytes="+QByteArray::number(sizeAtPause)+"-";
 		request.setRawHeader(QByteArray("Range"), rangeHeader);

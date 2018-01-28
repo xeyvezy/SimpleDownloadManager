@@ -3,12 +3,9 @@
 #include <QSplitter> 
 #include <QItemDelegate> 
 #include <QPainter>
-#include <QMessageBox> 
-#include <QDebug>
 #include <QCheckBox>
 #include <QDesktopServices>
 #include <QDesktopWidget>
-#include <QSettings>
 
 class TableDelegate : public QItemDelegate {
 	public:
@@ -84,6 +81,7 @@ MainWindow::MainWindow(QWidget* parent):
 	
 	QResource::registerResource("resource.rcc");
 	ui->setupUi(this);
+	setWindowTitle("SimpleDownloadManager");
 
 	model = new DownloadModel(this);  
 	pmodel = new QSortFilterProxyModel(this);
@@ -192,6 +190,11 @@ void MainWindow::newDownload() {
 		//add a new row with empty download - (to display getting info)
 		model->insertRow(model->rowCount());
 
+		#ifdef DEBUG
+			qDebug() << "New Download: " << endl
+				<< "Url: " << url << " Row:" << model->rowCount() << endl;
+		#endif
+
 		bool start = 1;
 		QEventLoop loop;
 		connect(download, &Download::downloadInfoComplete, this, 
@@ -207,6 +210,10 @@ void MainWindow::newDownload() {
 			//update the empty download with new download
 			model->addDownload(download);
 			updateModel(download, DownloadModel::ALL);
+
+			#ifdef DEBUG
+				qDebug() << "New download added to model" << endl;
+			#endif
 
 			//updating progressbar
 			connect(download, &Download::progressUpdate, this, [=]{
@@ -245,11 +252,15 @@ void MainWindow::newDownload() {
 void MainWindow::deleteDownload() {
 	int row = ui->tableView->currentIndex().row(); 
 	if(row == -1) return;
+	
 	Download* download = model->getDownload(row);
+	if(!download) return; 
+	download->pauseDownload();
 	Download::DownloadState state = download->getState();
 		
 	QMessageBox msgBox(this); 
-	QCheckBox cbox;  
+	QCheckBox cbox;
+	cbox.setChecked(false);
 	if(state == Download::COMPLETED) { 
 		cbox.setText("Delete the downloaded file.");		
 		msgBox.setCheckBox(&cbox); 
@@ -260,15 +271,16 @@ void MainWindow::deleteDownload() {
 	msgBox.setIcon(QMessageBox::Question);
 	int selection =	msgBox.exec();
 	if(selection == QMessageBox::Yes) {
-		download->pauseDownload();
 		model->removeRow(row);
 		download->deleteLater();
 		if(state == Download::COMPLETED) 
 			if(!cbox.isChecked()) return;
+			
 		QFile file(download->getFileName());		
 		if(file.exists())
 			file.remove();
-	}
+	} else 
+		download->resumeDownload();
 }
    
 bool MainWindow::updateModel(Download* download, 

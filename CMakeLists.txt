@@ -20,9 +20,19 @@ file(GLOB INC_FILE
 )
 
 find_package(Qt5 COMPONENTS REQUIRED Widgets Network)
+
+if(WIN32)
+	find_library(WSOCK32_LIBRARY wsock32)
+	if(NOT WSOCK32_LIBRARY)
+		message(FATAL_ERROR "WSOCK32_LIBRARY Not Found")
+	else()
+		set(WIN_LIB wsock32)
+	endif()
+endif()
+
 if(Qt5_FOUND)
-	add_executable(${PROJECT_NAME} ${SRC_FILE} ${INC_FILE})
-	target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Network)
+	add_executable(${PROJECT_NAME} ${SRC_FILE} ${INC_FILE})	
+	target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Network ${WIN_LIB})
 else()
 	message(FATAL_ERROR "QT5 Not Found!")
-endif(Qt5_FOUND)
+endif()

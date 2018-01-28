@@ -10,6 +10,8 @@
 #include <QElapsedTimer>
 #include <QStorageInfo>
 
+#define DEBUG
+
 class Download : public QObject {
 
 Q_OBJECT
@@ -24,6 +26,7 @@ public:
 	};
 
 	explicit Download(QUrl url, bool newDownload, QObject* parent = 0);
+	~Download();
 
 	void getDownloadInfo();
 	void startDownload();
