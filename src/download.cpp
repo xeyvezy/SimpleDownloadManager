@@ -5,7 +5,7 @@
 QNetworkAccessManager* Download::manager = Q_NULLPTR;
 
 Download::Download(QUrl url, bool newDownload, QObject* parent): 
-	QObject(parent) {
+		QObject(parent) {
 	
 	if(manager == Q_NULLPTR) {
 		Download::initNetworkAccessManager();
@@ -63,8 +63,8 @@ void Download::startDownload() {
 	});
 
 	//Download progress
-	connect(reply, &QNetworkReply::downloadProgress, this, [&]
-		(qint64 bytesReceived, qint64 bytesTotal) {
+	connect(reply, &QNetworkReply::downloadProgress, this, 
+			[&](qint64 bytesReceived, qint64 bytesTotal) {
 		if(bytesTotal > 0 && fileSize < 0) {
 			fileSize = bytesTotal;
 			fileSizeString = convertSizeTString(fileSize);

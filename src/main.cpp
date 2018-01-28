@@ -5,11 +5,14 @@
 	#include <sys/socket.h>
 	#include <unistd.h>
 	#include <netdb.h> 
-	#include <netinet/in.h>
 	#define	CLOSE(sockfd) close(sockfd)
 #elif _WIN32
-	#include <winsock.h>
-	#define CLOSE(sockfd) closesocket(sockfd)
+	#ifndef _WIN32_WINNT
+   	#define _WIN32_WINNT 0x0501  /* Windows XP. */
+	#endif
+  	#include <winsock2.h>
+  	#include <Ws2tcpip.h>
+	#define CLOSE(sockfd) closesocket(sockfd); WSACleanup()
 #else 
 	#error "Unknown Platform"
 #endif
@@ -25,15 +28,13 @@ public:
 
 	~SingleInstance() {
 		CLOSE(sockfd);
-	}
+	} 
 
 	bool operator()(const char* iport) {
-		struct addrinfo hints, *res;
+		struct addrinfo hints, *res, *p;
 
 		#ifdef _WIN32
 			WSADATA wsaData;
-			MAKEWORD(1,1);
-
 			if(WSAStartup(MAKEWORD(1,1), &wsaData) != 0) {
 				qDebug() << "WSAStartup failed." << endl;
 				exit(1);	
@@ -50,18 +51,18 @@ public:
 			qDebug() << "Addrinfo failed" << endl;
 			exit(1);
 		}
- 
-		if((sockfd = socket(res->ai_family, 
-			res->ai_socktype, res->ai_protocol)) < 0) {
-			
+
+		if((sockfd = socket(res->ai_family, res->ai_socktype, 
+				res->ai_protocol)) == -1) {
 			qDebug() << "Socket creation failed" << endl;
 			exit(1);
 		}
 		
 		//if bind fails there is another application using the port (another instance running)
-		if(bind(sockfd, res->ai_addr, res->ai_addrlen) < 0)
+		if(bind(sockfd, res->ai_addr, res->ai_addrlen) == -1)
 			return false;
 
+		freeaddrinfo(res);
 		return true;
 	}
 

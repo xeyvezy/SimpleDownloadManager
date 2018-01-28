@@ -22,11 +22,11 @@ file(GLOB INC_FILE
 find_package(Qt5 COMPONENTS REQUIRED Widgets Network)
 
 if(WIN32)
-	find_library(WSOCK32_LIBRARY wsock32)
-	if(NOT WSOCK32_LIBRARY)
-		message(FATAL_ERROR "WSOCK32_LIBRARY Not Found")
+	find_library(WS2_32_LIBRARY ws2_32)
+	if(NOT WS2_32_LIBRARY)
+		message(FATAL_ERROR "WS2_32_LIBRARY Not Found")
 	else()
-		set(WIN_LIB wsock32)
+		set(WIN_LIB ws2_32)
 	endif()
 endif()
 
