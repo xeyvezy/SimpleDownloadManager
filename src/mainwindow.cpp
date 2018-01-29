@@ -84,8 +84,6 @@ MainWindow::MainWindow(QWidget* parent):
 	ui->setupUi(this);
 	setWindowTitle("SimpleDownloadManager");
 
-	DefaultDirs::initDefaultDirs();
-
 	model = new DownloadModel(this);
 	pmodel = new QSortFilterProxyModel(this);
 	pmodel->setSourceModel(model);

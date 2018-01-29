@@ -85,6 +85,7 @@ int main(int argc, char* argv[]) {
 
 	if(instance(port.toStdString().c_str())) {
 		//Application MainWindow
+		DefaultDirs::initDefaultDirs();
 		MainWindow mainwindow;
 		mainwindow.show();
 		return app.exec();
