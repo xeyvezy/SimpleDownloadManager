@@ -6,17 +6,18 @@
 #include <QNetworkRequest>
 #include <QFile>
 #include <QEventLoop>
-#include <QApplication> 
+#include <QApplication>
 #include <QElapsedTimer>
 #include <QStorageInfo>
+#include "defaultDirs.h"
 
-#define DEBUG
+// #define DEBUG
 
 class Download : public QObject {
 
 Q_OBJECT
 
-public: 
+public:
 	enum DownloadState {
 		NOTHING = 0x0000,
 		DOWNLOADING = 0x0001,
@@ -25,8 +26,11 @@ public:
 		FAILED = 0x0004
 	};
 
-	explicit Download(QUrl url, bool newDownload, QObject* parent = 0);
-	~Download();
+	//Constructor for creating brand new download
+	explicit Download(QUrl url, QObject *parent = 0);
+	//constructor loading downloads from the log
+	explicit Download(QString fileName, QUrl url, qint64 filesize,
+		DownloadState state, QObject *parent = 0);
 
 	void getDownloadInfo();
 	void startDownload();
@@ -51,11 +55,11 @@ private:
 	QNetworkReply* reply;
 	QNetworkRequest request;
 	static QNetworkAccessManager* manager;
-	
+
 	//Methods
 	static void initNetworkAccessManager();
 	bool fileExists(QString path);
-	void updateDownloadInfo();
+	void checkFileName();
 	void emitStateChanged() {
 		emit stateChanged(state);
 	}
@@ -88,6 +92,10 @@ public:
 		return fileName;
 	}
 
+	QString getFilePath() const {
+		return file.fileName();
+	}
+
 	DownloadState getState() const {
 		return state;
 	}
@@ -114,4 +122,4 @@ public:
 	QString getSpeedString() const {
 		return speedString;
 	}
-}; 
+};

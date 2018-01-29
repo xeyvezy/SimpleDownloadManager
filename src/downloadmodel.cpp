@@ -1,19 +1,17 @@
 #include "downloadmodel.h"
 #include <algorithm>
 #include <QMessageBox>
- 
-const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress", 
-	"Speed/s", "Size", "State"}; 
+
+const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress",
+	"Speed/s", "Size", "State"};
 const QString DownloadModel::DEFAULT_TEXT = "Getting Download Info....";
 
-DownloadModel::DownloadModel(QObject* parent): 
-	QAbstractTableModel(parent), downloadCount(0) {
-	  
-}
- 
+DownloadModel::DownloadModel(QObject* parent):
+	QAbstractTableModel(parent), downloadCount(0) {}
+
 int DownloadModel::rowCount(const QModelIndex& parent) const {
 	return downloadCount;
-}  
+}
 
 int DownloadModel::columnCount(const QModelIndex& parent) const {
 	return COL_CNT;
@@ -21,13 +19,13 @@ int DownloadModel::columnCount(const QModelIndex& parent) const {
 
 QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 	if(!index.isValid()) return QVariant();
-	if(role == Qt::TextAlignmentRole)  
-		return int(Qt::AlignVCenter|Qt::AlignRight); 
+	if(role == Qt::TextAlignmentRole)
+		return int(Qt::AlignVCenter|Qt::AlignRight);
 	else if(role == Qt::DisplayRole) {
 		Download* download = downloads.at(index.row());
 		if(!download) { //Display getting info if download in nullptr
 			if(index.column() == 1)
-				return QVariant(DEFAULT_TEXT); 
+				return QVariant(DEFAULT_TEXT);
 		} else {
 			switch(index.column()) {
 				case 0:
@@ -35,7 +33,7 @@ QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 				case 1:
 					return QVariant(download->getFileName());
 				case 2:
-					return QVariant(download->getProgress()); 
+					return QVariant(download->getProgress());
 				case 3:
 					return QVariant(download->getSpeedString());
 				case 4:
@@ -43,17 +41,17 @@ QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 				case 5:
 					return QVariant(download->getStateString());
 			}
-		}		 
+		}
 	}
 	return QVariant();
-} 
+}
 
-QVariant DownloadModel::headerData(int section, Qt::Orientation orientation, 
+QVariant DownloadModel::headerData(int section, Qt::Orientation orientation,
 		int role) const {
-	
-	if(role != Qt::DisplayRole || (orientation != Qt::Orientation::Horizontal)) 
+
+	if(role != Qt::DisplayRole || (orientation != Qt::Orientation::Horizontal))
 		return QVariant();
-	
+
 	switch(section) {
 		case 0:
 			return QVariant(HEADERS[0]);
@@ -108,7 +106,7 @@ bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 			index1 = QAbstractItemModel::createIndex(index.row(), 0);
 			break;
 	}
- 
+
 	emit dataChanged(index1, index2);
 	return 1;
 }
@@ -124,7 +122,7 @@ bool DownloadModel::insertRows(int row, int count, const QModelIndex& parent) {
 
 bool DownloadModel::removeRows(int row, int count, const QModelIndex &parent) {
 	if(row > downloadCount) return false;
-	
+
 	beginRemoveRows(parent, row, row+(count-1));
 	endRemoveRows();
 	downloads.removeAt(row);
@@ -132,7 +130,13 @@ bool DownloadModel::removeRows(int row, int count, const QModelIndex &parent) {
 	return true;
 }
 
-void DownloadModel::addDownload(Download* download) {
+void DownloadModel::replaceDownloadLRow(Download* download) {
 
-	downloads[downloadCount-1] = download;
-} 
+	Download **dwnLRow = &downloads[downloadCount-1];
+	if(*dwnLRow) {
+		qDebug() << "Warning a valid download exists." << endl;
+		(*dwnLRow)->deleteLater();
+		dwnLRow = Q_NULLPTR;
+	}
+	*dwnLRow = download;
+}

@@ -4,9 +4,9 @@
 
 QNetworkAccessManager* Download::manager = Q_NULLPTR;
 
-Download::Download(QUrl url, bool newDownload, QObject* parent): 
+Download::Download(QUrl url, QObject* parent):
 		QObject(parent) {
-	
+
 	if(manager == Q_NULLPTR) {
 		Download::initNetworkAccessManager();
 	}
@@ -22,16 +22,24 @@ Download::Download(QUrl url, bool newDownload, QObject* parent):
 	this->request = QNetworkRequest(this->url);
 	this->stime.start();
 	//Redirect
-	request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, 
-		QVariant("MyRequest")); 
-} 
+	request.setAttribute(QNetworkRequest::FollowRedirectsAttribute,
+		QVariant("MyRequest"));
+}
 
-Download::~Download() {
-	#ifdef DEBUG
-		qDebug() << "Download Destroyed: " << fileName << endl;
-	#endif
-	if(this->reply)
-		this->reply->abort();
+Download::Download(QString fileName, QUrl url, qint64 fileSize,
+		DownloadState state, QObject *parent): Download(url, parent) {
+	this->fileName = fileName;
+	this->fileSize = fileSize;
+	this->state = state;
+	this->file.setFileName(DefaultDirs::DEFAULT_TEMP+fileName);
+	this->fileSizeString = convertSizeTString(fileSize);
+
+	if(state == COMPLETED)
+		this->progress = 100;
+	else {
+		this->sizeAtPause = file.size();
+		this->progress = (sizeAtPause*100)/fileSize;
+	}
 }
 
 void Download::initNetworkAccessManager() {
@@ -39,17 +47,17 @@ void Download::initNetworkAccessManager() {
 }
 
 void Download::deleteManager() {
-	delete manager;
+	delete Download::manager;
 }
 
-void Download::startDownload() { 
-  	
+void Download::startDownload() {
+
 	if(!file.open(QIODevice::WriteOnly|QIODevice::Append)) {
 		qDebug() << "Error: " << file.errorString();
 		emit downloadError(file.errorString());
 		return;
 	}
-	
+
 	#ifdef DEBUG
 		qDebug() << "Starting Download: " <<  fileName << endl;
 	#endif
@@ -63,7 +71,7 @@ void Download::startDownload() {
 	});
 
 	//Download progress
-	connect(reply, &QNetworkReply::downloadProgress, this, 
+	connect(reply, &QNetworkReply::downloadProgress, this,
 			[&](qint64 bytesReceived, qint64 bytesTotal) {
 		if(bytesTotal > 0 && fileSize < 0) {
 			fileSize = bytesTotal;
@@ -81,7 +89,7 @@ void Download::startDownload() {
 				speed = bytesReceived - lastReceived;
 				lastReceived = bytesReceived;
 				speedString = convertSizeTString(speed);
-				emit downloadSpeed(speed); 
+				emit downloadSpeed(speed);
 				stime.restart();
 			}
 			// #ifdef DEBUG
@@ -100,27 +108,25 @@ void Download::startDownload() {
 				qDebug() << "Error: " << reply->errorString();
 				emit downloadError(reply->errorString());
 				state = FAILED;
-				emitStateChanged();
 			}
 		} else {
 			#ifdef DEBUG
 				qDebug() << "Finished downloading " << fileName << endl;
 			#endif
 			state = COMPLETED;
-			emitStateChanged();
 		}
-		
+
 		speedString = "";
 		emit downloadSpeed(0);
-
-		file.close(); 
+		emitStateChanged();
+		file.close();
 		reply->deleteLater();
 		reply = Q_NULLPTR;
 	});
 }
 
 void Download::pauseDownload() {
-	if(!reply) return;
+	if(!reply || state == COMPLETED || state == PAUSED) return;
 	#ifdef DEBUG
 		qDebug() << "Download Paused" << fileName << endl
 		 	<< "Size on disk: " << file.size() << endl;
@@ -132,6 +138,7 @@ void Download::pauseDownload() {
 }
 
 void Download::resumeDownload() {
+	if(state != PAUSED || state == COMPLETED) return;
 	if(file.size() > 0) {
 		#ifdef DEBUG
 			qDebug() << "Download Resumed" << endl
@@ -150,9 +157,9 @@ void Download::resumeDownload() {
  * 	If "Content-Length" is emply filesize is -1
  * 	If "Content-Disposition" is emply fileName is url.fileName()
  */
-void Download::getDownloadInfo() { 
+void Download::getDownloadInfo() {
 	reply = manager->get(request);
-	connect(reply, &QNetworkReply::readyRead, this, [&]{		
+	connect(reply, &QNetworkReply::readyRead, this, [&]{
 		QString data = reply->rawHeader("Content-Length");
 		if(!data.isEmpty())
 			fileSize = data.toInt();
@@ -161,7 +168,7 @@ void Download::getDownloadInfo() {
 		if(!data.isEmpty()) {
 			int x = data.indexOf('=');
 			fileName = data.mid(x+1, data.length());
-		} 
+		}
 
 		reply->abort();
 		reply->deleteLater();
@@ -170,37 +177,48 @@ void Download::getDownloadInfo() {
 
 	//wait for reply to finish
 	connect(reply, &QNetworkReply::finished, this, [&]{
-		if(reply->error() == reply->ProtocolUnknownError) 
+		if(reply->error() == reply->ProtocolUnknownError)
 			emit downloadInfoComplete("Invalid Downlaod URL!", reply->error());
 		else if(reply->error() != reply->OperationCanceledError)
 			emit downloadInfoComplete(reply->errorString(), reply->error());
 		else {
-			updateDownloadInfo();
+			checkFileName();
 			emit downloadInfoComplete(reply->errorString(), 0);
 		}
 	});
 }
 
-void Download::updateDownloadInfo() {
-	//set fileName&fileSize
-
-	if(fileExists(fileName)) {
+/**
+ * check if file name already exists, if so append add a number to make it unique
+ */
+void Download::checkFileName() {
+	if(fileExists(DefaultDirs::DEFAULT_TEMP+fileName)) {
 		int i = 1;
-		while(fileExists(QString::number(i)+"-"+fileName)) {
+		QStringList list = fileName.split(".");
+		QString name = list.at(0);
+		QString ext;
+		for(int i = 1; i < list.size(); ++i) {
+			ext.append("."+list.at(i));
+		}
+		while(fileExists(DefaultDirs::DEFAULT_TEMP+QString::number(i) + "-" +
+				name + ext)) {
 			++i;
 		}
 		fileName = QString::number(i)+"-"+fileName;
 	}
-	this->file.setFileName(fileName);
+	this->file.setFileName(DefaultDirs::DEFAULT_TEMP+fileName);
 }
 
 bool Download::fileExists(QString path) {
 	QFileInfo check(path);
+	#ifdef DEBUG
+		qDebug() << path;
+	#endif
 	return check.exists() && check.isFile();
 }
 
-QString Download::convertSizeTString(qint64 size) { 
- 	if(size < 0) { 
+QString Download::convertSizeTString(qint64 size) {
+ 	if(size < 0) {
 		 return QString("UN"); //unknown
 	 }
 	int i = 0;

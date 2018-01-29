@@ -1,11 +1,12 @@
-#include "mainwindow.h"
-#include "ui_inputdialog.h"
-#include <QSplitter> 
-#include <QItemDelegate> 
+#include <QSplitter>
+#include <QItemDelegate>
 #include <QPainter>
 #include <QCheckBox>
 #include <QDesktopServices>
 #include <QDesktopWidget>
+#include <QDir>
+#include "mainwindow.h"
+#include "ui_inputdialog.h"
 
 class TableDelegate : public QItemDelegate {
 	public:
@@ -13,7 +14,7 @@ class TableDelegate : public QItemDelegate {
 
 		void paint(QPainter* painter, const QStyleOptionViewItem& option,
 			const QModelIndex& index) const override {
-			
+
 			QStyleOptionViewItem option2 = option;
 			option2.state = option.state & (~QStyle::State_HasFocus);
 
@@ -37,16 +38,16 @@ class TableDelegate : public QItemDelegate {
 				if(progressbar.state & QStyle::State_Active)
 					painter->fillRect(progressbar.rect, option2.palette.highlight());
 				else {
-					painter->fillRect(progressbar.rect, 
+					painter->fillRect(progressbar.rect,
 						option2.palette.brush(QPalette::Inactive, QPalette::Highlight));
 				}
 			}
 			//set progressbar value & text
-			progressbar.progress = index.data().toInt(); 
+			progressbar.progress = index.data().toInt();
 			progressbar.text = index.data().toString()+"%";
- 
+
 			//draw
-			qApp->style()->drawControl(QStyle::CE_ProgressBar,  
+			qApp->style()->drawControl(QStyle::CE_ProgressBar,
 				&progressbar, painter);
 		}
 };
@@ -56,7 +57,7 @@ class InputDialog : public QDialog {
 public:
 	explicit InputDialog(QString title, QString label, QWidget* parent = 0):
 		QDialog(parent), ui(new  Ui::Dialog) {
-		
+
 		ui->setupUi(this);
 		this->setWindowTitle(title);
 		this->setModal(true);
@@ -78,15 +79,25 @@ private:
 
 MainWindow::MainWindow(QWidget* parent):
 	QMainWindow(parent), ui(new Ui::MainWindow) {
-	
+
 	QResource::registerResource("resource.rcc");
 	ui->setupUi(this);
 	setWindowTitle("SimpleDownloadManager");
 
-	model = new DownloadModel(this);  
+	DefaultDirs::initDefaultDirs();
+
+	model = new DownloadModel(this);
 	pmodel = new QSortFilterProxyModel(this);
 	pmodel->setSourceModel(model);
-	pmodel->setFilterKeyColumn(5); 
+	pmodel->setFilterKeyColumn(5);
+
+	//Load previous downloads and connect if not completed
+	downloadLog.loadPreviousDownloads(model);
+	for(int i = 0; i < model->rowCount(); ++i) {
+		Download *download = model->getDownload(i);
+		if(download->getState() != Download::COMPLETED)
+			connectSignals(download);
+	}
 
 	setupTableView();
 	setupListView();
@@ -113,18 +124,16 @@ MainWindow::MainWindow(QWidget* parent):
 				return;
 		}
 	});
-	
+
 	//Create a new download
 	connect(ui->actionNew, &QAction::triggered, this, &MainWindow::newDownload);
-	
+
 	//pause download
 	connect(ui->actionPause, &QAction::triggered, this, [this]{
 		int row = ui->tableView->currentIndex().row();
 		if(row == -1) return;
 		Download* download = model->getDownload(row);
 		Download::DownloadState state = download->getState();
-	
-	
 		if(state != Download::PAUSED && state != Download::COMPLETED)
 			download->pauseDownload();
 	});
@@ -140,9 +149,9 @@ MainWindow::MainWindow(QWidget* parent):
 	});
 
 	//delete download
-	//If the download is incomplete the file is deleted 
+	//If the download is incomplete the file is deleted
 	//else the user gets option to delete it
-	connect(ui->actionDelete, &QAction::triggered, this, 
+	connect(ui->actionDelete, &QAction::triggered, this,
 		&MainWindow::deleteDownload);
 }
 
@@ -151,7 +160,150 @@ MainWindow::~MainWindow() {
 	saveState();
 	delete ui;
 	Download::deleteManager();
-}         
+}
+
+void MainWindow::newDownload() {
+	InputDialog* dialog = new InputDialog("New Download",
+		"Enter Download URL: ", this);
+
+	dialog->show();
+	connect(dialog, &QDialog::accepted, this, [=]{
+		QUrl url = dialog->getVal();
+		//add new download to model
+		Download* download = new Download(url, model);
+		//add a new row with empty download - (to display getting info)
+		model->insertRow(model->rowCount());
+
+		#ifdef DEBUG
+			qDebug() << "New Download: " << endl
+				<< "Url: " << url << " Row:" << model->rowCount() << endl;
+		#endif
+
+		bool start = 1;
+		QEventLoop loop;
+		connect(download, &Download::downloadInfoComplete, this,
+			[=,&loop,&start](QString message, bool error){
+			if(error) {
+				QMessageBox::warning(this, "Error!", message);
+				download->deleteLater();
+				//remove newly added row on error
+				model->removeRow(model->rowCount()-1);
+				return;
+			}
+
+			//update the empty download with new download
+			model->replaceDownloadLRow(download);
+			updateModel(download, DownloadModel::ALL);
+			downloadLog.addNewDownload(download);
+
+			#ifdef DEBUG
+				qDebug() << "New download added to model" << endl;
+			#endif
+
+			connectSignals(download);
+
+			start = 0;
+			loop.exit();
+		});
+
+		download->getDownloadInfo();
+		loop.exec();
+		//Don't start download till downloadInfoComplete slot is finished
+		//Don't start download on error
+		if(!start) download->startDownload();
+	});
+}
+
+void MainWindow::connectSignals(Download *download) {
+	//updating progressbar
+	connect(download, &Download::progressUpdate, this, [=]{
+		updateModel(download, DownloadModel::PROGRESS);
+	});
+	//update speed
+	connect(download, &Download::downloadSpeed, this, [=]{
+		updateModel(download, DownloadModel::SPEED);
+	});
+	//update size if updateDownloadInfo fails
+	connect(download, &Download::fileSizeUpdate, this, [=]{
+		updateModel(download, DownloadModel::SIZE);
+	});
+	//update download state
+	connect(download, &Download::stateChanged, this, [=]{
+		updateModel(download, DownloadModel::STATE);
+		//On completion
+		if(download->getState() == Download::COMPLETED){
+			downloadLog.updateLog(download->getFileName(), false);
+			//Move file
+			QDir dir;
+			dir.rename(download->getFilePath(),
+				DefaultDirs::DEFAULT_SAVE+download->getFileName());
+		}
+	});
+	//errors while downloading
+	connect(download, &Download::downloadError, this,
+			[=](QString message){
+		download->pauseDownload();
+		QMessageBox::warning(this, "Error!", message);
+	});
+}
+
+void MainWindow::deleteDownload() {
+	int row = ui->tableView->currentIndex().row();
+	if(row == -1) return;
+
+	Download* download = model->getDownload(row);
+	if(!download) return;
+	//Dont resume if the download was paused before pressing delete
+	Download::DownloadState stateBefore = download->getState();
+	download->pauseDownload();
+	Download::DownloadState state = download->getState();
+
+	QMessageBox msgBox(this);
+	QCheckBox cbox;
+	cbox.setChecked(false);
+	if(state == Download::COMPLETED) {
+		cbox.setText("Delete the downloaded file.");
+		msgBox.setCheckBox(&cbox);
+		cbox.setFocusPolicy(Qt::FocusPolicy::NoFocus);
+	}
+	msgBox.setText("Do you really want to delete the download?");
+	msgBox.setStandardButtons(QMessageBox::Yes|QMessageBox::No);
+	msgBox.setIcon(QMessageBox::Question);
+
+	int selection =	msgBox.exec();
+	if(selection == QMessageBox::Yes) {
+		model->removeRow(row);
+		download->deleteLater();
+		QFile file(download->getFilePath());
+		if(state == Download::COMPLETED)
+			if(!cbox.isChecked()) return;
+			else file.setFileName(DefaultDirs::DEFAULT_SAVE+
+				download->getFileName());
+		deleteFile(download->getFileName(), file);
+	} else {
+		if(stateBefore != Download::PAUSED);
+			download->resumeDownload();
+	}
+}
+
+void MainWindow::deleteFile(QString fileName, QFile &file) {
+	if(file.exists()) {
+		if(!file.remove()) qDebug() << "Failed To Delete: "
+			<< file.fileName();
+	} else {
+		QMessageBox::warning(this, "File Not Found!",
+			"File was already deleted!");
+	}
+	downloadLog.updateLog(fileName, true);
+}
+
+bool MainWindow::updateModel(Download* download,
+	DownloadModel::UPDATE_FIELD field) const {
+
+	int row = model->getDownloadIndex(download);
+	QModelIndex index = model->index(row, 0);
+	model->setData(index, QVariant(field));
+}
 
 void MainWindow::setupTableView() {
 	TableDelegate *delegate = new TableDelegate(this);
@@ -159,7 +311,7 @@ void MainWindow::setupTableView() {
 	ui->tableView->setItemDelegate(delegate);
 	ui->tableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
 	ui->tableView->setSelectionBehavior(QAbstractItemView::SelectRows);
-	ui->tableView->horizontalHeader()->setHighlightSections(false); 
+	ui->tableView->horizontalHeader()->setHighlightSections(false);
 	ui->tableView->verticalHeader()->setVisible(false);
 	ui->tableView->setShowGrid(false);
 	ui->tableView->setSortingEnabled(false);
@@ -178,122 +330,9 @@ void MainWindow::setupListView() {
 	ui->listView->setCurrentIndex(smodel->index(0,0));
 }
 
-void MainWindow::newDownload() {
-	InputDialog* dialog = new InputDialog("New Download", 
-		"Enter Download URL: ", this);
-		
-	dialog->show();
-	connect(dialog, &QDialog::accepted, this, [=]{
-		QUrl url = dialog->getVal();
-		//add new download to model
-		Download* download = new Download(url, 1, model);
-		//add a new row with empty download - (to display getting info)
-		model->insertRow(model->rowCount());
-
-		#ifdef DEBUG
-			qDebug() << "New Download: " << endl
-				<< "Url: " << url << " Row:" << model->rowCount() << endl;
-		#endif
-
-		bool start = 1;
-		QEventLoop loop;
-		connect(download, &Download::downloadInfoComplete, this, 
-			[=,&loop,&start](QString message, bool error){
-			if(error) {
-				QMessageBox::warning(this, "Error!", message);
-				download->deleteLater();
-				//remove newly added row on error
-				model->removeRow(model->rowCount()-1);
-				return;
-			} 
-			
-			//update the empty download with new download
-			model->addDownload(download);
-			updateModel(download, DownloadModel::ALL);
-
-			#ifdef DEBUG
-				qDebug() << "New download added to model" << endl;
-			#endif
-
-			//updating progressbar
-			connect(download, &Download::progressUpdate, this, [=]{
-				updateModel(download, DownloadModel::PROGRESS);
-			});
-			//update speed
-			connect(download, &Download::downloadSpeed, this, [=]{
-				updateModel(download, DownloadModel::SPEED);
-			});
-			//update size if updateDownloadInfo fails
-			connect(download, &Download::fileSizeUpdate, this, [=]{
-				updateModel(download, DownloadModel::SIZE);
-			});
-			//update download state
-			connect(download, &Download::stateChanged, this, [=]{
-				updateModel(download, DownloadModel::STATE);
-			});
-			//errors while downloading
-			connect(download, &Download::downloadError, this, 
-				[=](QString message){
-				download->pauseDownload();
-				QMessageBox::warning(this, "Error!", message);
-			});
-			start = 0;
-			loop.exit();
-		});
-		
-		download->getDownloadInfo(); 
-		loop.exec();
-		//Don't start download till downloadInfoComplete slot is finished
-		//Don't start download on error
-		if(!start) download->startDownload(); 
-	});
-}
-
-void MainWindow::deleteDownload() {
-	int row = ui->tableView->currentIndex().row(); 
-	if(row == -1) return;
-	
-	Download* download = model->getDownload(row);
-	if(!download) return; 
-	download->pauseDownload();
-	Download::DownloadState state = download->getState();
-		
-	QMessageBox msgBox(this); 
-	QCheckBox cbox;
-	cbox.setChecked(false);
-	if(state == Download::COMPLETED) { 
-		cbox.setText("Delete the downloaded file.");		
-		msgBox.setCheckBox(&cbox); 
-		cbox.setFocusPolicy(Qt::FocusPolicy::NoFocus);
-	}
-	msgBox.setText("Do you really want to delete the download?");
-	msgBox.setStandardButtons(QMessageBox::Yes|QMessageBox::No);	
-	msgBox.setIcon(QMessageBox::Question);
-	int selection =	msgBox.exec();
-	if(selection == QMessageBox::Yes) {
-		model->removeRow(row);
-		download->deleteLater();
-		if(state == Download::COMPLETED) 
-			if(!cbox.isChecked()) return;
-			
-		QFile file(download->getFileName());		
-		if(file.exists())
-			file.remove();
-	} else 
-		download->resumeDownload();
-}
-   
-bool MainWindow::updateModel(Download* download, 
-	DownloadModel::UPDATE_FIELD field) const { 
-	
-	int row = model->getDownloadIndex(download);
-	QModelIndex index = model->index(row, 0);
-	model->setData(index, QVariant(field));
-} 
-
 void MainWindow::saveState() {
-	QSettings settings(QSettings::IniFormat, QSettings::UserScope, 
-		"AB", "Simple Download Manager"); 
+	QSettings settings(QSettings::IniFormat, QSettings::UserScope,
+		"AB", "Simple Download Manager");
 	QByteArray table_state = ui->tableView->horizontalHeader()->saveState();
 	QByteArray msplitter_state = ui->splitter_2->saveState();
 	QByteArray ssplitter_state = ui->splitter->saveState();
@@ -308,18 +347,16 @@ void MainWindow::saveState() {
 }
 
 void MainWindow::restoreState() {
-	QSettings settings(QSettings::IniFormat, QSettings::UserScope, 
-		"AB", "Simple Download Manager"); 
+	QSettings settings(QSettings::IniFormat, QSettings::UserScope,
+		"AB", "Simple Download Manager");
 	settings.beginGroup("MainWindow");
 	//key, default data
 	resize(settings.value("size", QSize(800, 400)).toSize());
 	move(settings.value("pos", QPoint(200, 200)).toPoint());
-	
+
 	ui->tableView->horizontalHeader()->restoreState(settings.value("table_state").toByteArray());
 	ui->splitter_2->restoreState(settings.value("msplitter_state").toByteArray());
 	ui->splitter->restoreState(settings.value("ssplitter_state").toByteArray());
 
 	settings.endGroup();
 }
-
- 
