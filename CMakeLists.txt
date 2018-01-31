@@ -12,27 +12,18 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
 include_directories(include)
 
 file(GLOB SRC_FILE
-"${SOURCE_DIR}/*.cpp" 
+"${SOURCE_DIR}/*.cpp"
 )
 
-file(GLOB INC_FILE 
+file(GLOB INC_FILE
 "${INCLUDE_DIR}/*.h"
 )
 
 find_package(Qt5 COMPONENTS REQUIRED Widgets Network)
 
-if(WIN32)
-	find_library(WS2_32_LIBRARY ws2_32)
-	if(NOT WS2_32_LIBRARY)
-		message(FATAL_ERROR "WS2_32_LIBRARY Not Found")
-	else()
-		set(WIN_LIB ws2_32)
-	endif()
-endif()
-
 if(Qt5_FOUND)
-	add_executable(${PROJECT_NAME} ${SRC_FILE} ${INC_FILE})	
-	target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Network ${WIN_LIB})
+	add_executable(${PROJECT_NAME} ${SRC_FILE} ${INC_FILE})
+	target_link_libraries(${PROJECT_NAME} Qt5::Widgets Qt5::Network)
 else()
 	message(FATAL_ERROR "QT5 Not Found!")
 endif()
