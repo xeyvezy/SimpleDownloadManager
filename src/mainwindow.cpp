@@ -83,6 +83,7 @@ MainWindow::MainWindow(QWidget* parent):
 	QResource::registerResource("resource.rcc");
 	ui->setupUi(this);
 	setWindowTitle("SimpleDownloadManager");
+	setupTrayIcon();
 
 	model = new DownloadModel(this);
 	pmodel = new QSortFilterProxyModel(this);
@@ -131,6 +132,7 @@ MainWindow::MainWindow(QWidget* parent):
 		int row = ui->tableView->currentIndex().row();
 		if(row == -1) return;
 		Download* download = model->getDownload(row);
+		if(!download) return;
 		Download::DownloadState state = download->getState();
 		if(state != Download::PAUSED && state != Download::COMPLETED)
 			download->pauseDownload();
@@ -141,16 +143,30 @@ MainWindow::MainWindow(QWidget* parent):
 		int row = ui->tableView->currentIndex().row();
 		if(row == -1) return;
 		Download* download = model->getDownload(row);
+		if(!download) return;
 		Download::DownloadState state = download->getState();
 		if(state == Download::PAUSED && state != Download::COMPLETED)
 			download->resumeDownload();
 	});
 
 	//delete download
-	//If the download is incomplete the file is deleted
-	//else the user gets option to delete it
 	connect(ui->actionDelete, &QAction::triggered, this,
 		&MainWindow::deleteDownload);
+
+	//Menu
+	connect(ui->actionQuit, &QAction::triggered, qApp, &QApplication::quit);
+
+	//Hide/Show tray icon
+	connect(ui->actionTrayIcon, &QAction::changed, this, [this] {
+		if(ui->actionMinTray->isEnabled()) {
+			ui->actionMinTray->setChecked(false);
+			ui->actionMinTray->setDisabled(true);
+			tray->hide();
+		} else {
+			ui->actionMinTray->setDisabled(false);
+			tray->show();
+		}
+	});
 }
 
 MainWindow::~MainWindow() {
@@ -193,6 +209,9 @@ void MainWindow::newDownload() {
 			model->replaceDownloadLRow(download);
 			updateModel(download, DownloadModel::ALL);
 			downloadLog.addNewDownload(download);
+			QModelIndex index = model->index(model->rowCount()-1, 0);
+			ui->tableView->setCurrentIndex(index);
+			ui->tableView->selectRow(model->rowCount()-1);
 
 			#ifdef DEBUG
 				qDebug() << "New download added to model" << endl;
@@ -274,10 +293,13 @@ void MainWindow::deleteDownload() {
 		download->deleteLater();
 		QFile file(download->getFilePath());
 		if(state == Download::COMPLETED)
-			if(!cbox.isChecked()) return;
-			else file.setFileName(DefaultDirs::DEFAULT_SAVE+
-				download->getFileName());
-		deleteFile(download->getFileName(), file);
+			if(!cbox.isChecked())
+				downloadLog.updateLog(download->getFileName(), true);
+			else {
+				file.setFileName(DefaultDirs::DEFAULT_SAVE+
+					download->getFileName());
+				deleteFile(download->getFileName(), file);
+			}
 	} else {
 		if(stateBefore != Download::PAUSED);
 			download->resumeDownload();
@@ -328,6 +350,38 @@ void MainWindow::setupListView() {
 	ui->listView->setCurrentIndex(smodel->index(0,0));
 }
 
+void MainWindow::setupTrayIcon() {
+	trayMenu = new QMenu(this);
+	showAction = new QAction("show", this);
+	showAction->setEnabled(false);
+
+	trayMenu->addAction(showAction);
+	trayMenu->addAction(ui->actionQuit);
+
+	tray = new QSystemTrayIcon(this);
+	tray->setIcon(QIcon(":/icons/icons/MainWindow.ico"));
+	tray->setContextMenu(trayMenu);
+	tray->setToolTip("Simple Download Manager");
+	tray->show();
+
+	connect(showAction, &QAction::triggered, this, [this]{
+		this->show();
+		this->setWindowState(this->windowState() & ~Qt::WindowMinimized | Qt::WindowActive);
+	});
+
+	connect(tray, &QSystemTrayIcon::activated, this,
+			[this](QSystemTrayIcon::ActivationReason reason){
+		if(reason == QSystemTrayIcon::Trigger) {
+			if(this->isHidden()) {
+				this->show();
+				this->setWindowState(Qt::WindowActive);
+			} else {
+				this->hide();
+			}
+		}
+	});
+}
+
 void MainWindow::saveState() {
 	QSettings settings(QSettings::IniFormat, QSettings::UserScope,
 		"AB", "Simple Download Manager");
@@ -357,4 +411,29 @@ void MainWindow::restoreState() {
 	ui->splitter->restoreState(settings.value("ssplitter_state").toByteArray());
 
 	settings.endGroup();
+}
+
+void MainWindow::closeEvent(QCloseEvent *e) {
+	QMessageBox::StandardButton res =
+		QMessageBox::question( this, "Simple Download Manager",
+            tr("Do you want to quit?"), QMessageBox::No | QMessageBox::Yes,
+        	QMessageBox::Yes);
+    if (res != QMessageBox::Yes) {
+        e->ignore();
+    } else {
+        e->accept();
+    }
+}
+
+void MainWindow::changeEvent(QEvent *e) {
+	if(e->type() == QEvent::WindowStateChange) {
+		if(this->isMinimized() && ui->actionMinTray->isChecked()) {
+			this->hide();
+			this->showAction->setEnabled(true);
+			e->ignore();
+		} else {
+			this->showAction->setEnabled(false);
+		}
+	}
+	QMainWindow::changeEvent(e);
 }

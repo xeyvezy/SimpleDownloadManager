@@ -32,12 +32,13 @@ class Ui_MainWindow
 {
 public:
     QAction *actionQuit;
-    QAction *actionOptions;
+    QAction *actionMinTray;
     QAction *actionAbout;
     QAction *actionNew;
     QAction *actionResume;
     QAction *actionPause;
     QAction *actionDelete;
+    QAction *actionTrayIcon;
     QWidget *centralwidget;
     QVBoxLayout *verticalLayout;
     QSplitter *splitter_2;
@@ -62,33 +63,38 @@ public:
         MainWindow->setWindowIcon(icon);
         actionQuit = new QAction(MainWindow);
         actionQuit->setObjectName(QStringLiteral("actionQuit"));
-        actionOptions = new QAction(MainWindow);
-        actionOptions->setObjectName(QStringLiteral("actionOptions"));
+        QIcon icon1;
+        icon1.addFile(QStringLiteral(":/icons/icons/delete.ico"), QSize(), QIcon::Normal, QIcon::Off);
+        actionQuit->setIcon(icon1);
+        actionMinTray = new QAction(MainWindow);
+        actionMinTray->setObjectName(QStringLiteral("actionMinTray"));
+        actionMinTray->setCheckable(true);
         actionAbout = new QAction(MainWindow);
         actionAbout->setObjectName(QStringLiteral("actionAbout"));
         actionNew = new QAction(MainWindow);
         actionNew->setObjectName(QStringLiteral("actionNew"));
-        QIcon icon1;
-        icon1.addFile(QStringLiteral(":/icons/icons/new.ico"), QSize(), QIcon::Normal, QIcon::Off);
-        actionNew->setIcon(icon1);
+        QIcon icon2;
+        icon2.addFile(QStringLiteral(":/icons/icons/new.ico"), QSize(), QIcon::Normal, QIcon::Off);
+        actionNew->setIcon(icon2);
         actionResume = new QAction(MainWindow);
         actionResume->setObjectName(QStringLiteral("actionResume"));
-        QIcon icon2;
-        icon2.addFile(QStringLiteral(":/icons/icons/play.ico"), QSize(), QIcon::Normal, QIcon::Off);
-        actionResume->setIcon(icon2);
+        QIcon icon3;
+        icon3.addFile(QStringLiteral(":/icons/icons/play.ico"), QSize(), QIcon::Normal, QIcon::Off);
+        actionResume->setIcon(icon3);
         actionPause = new QAction(MainWindow);
         actionPause->setObjectName(QStringLiteral("actionPause"));
-        QIcon icon3;
-        icon3.addFile(QStringLiteral(":/icons/icons/Pause.ico"), QSize(), QIcon::Normal, QIcon::Off);
-        actionPause->setIcon(icon3);
+        QIcon icon4;
+        icon4.addFile(QStringLiteral(":/icons/icons/Pause.ico"), QSize(), QIcon::Normal, QIcon::Off);
+        actionPause->setIcon(icon4);
         actionDelete = new QAction(MainWindow);
         actionDelete->setObjectName(QStringLiteral("actionDelete"));
-        QIcon icon4;
-        icon4.addFile(QStringLiteral(":/icons/icons/delete.ico"), QSize(), QIcon::Normal, QIcon::Off);
-        actionDelete->setIcon(icon4);
+        actionDelete->setIcon(icon1);
         actionDelete->setVisible(true);
         actionDelete->setIconVisibleInMenu(true);
         actionDelete->setShortcutVisibleInContextMenu(true);
+        actionTrayIcon = new QAction(MainWindow);
+        actionTrayIcon->setObjectName(QStringLiteral("actionTrayIcon"));
+        actionTrayIcon->setCheckable(true);
         centralwidget = new QWidget(MainWindow);
         centralwidget->setObjectName(QStringLiteral("centralwidget"));
         verticalLayout = new QVBoxLayout(centralwidget);
@@ -126,7 +132,7 @@ public:
         MainWindow->setCentralWidget(centralwidget);
         menubar = new QMenuBar(MainWindow);
         menubar->setObjectName(QStringLiteral("menubar"));
-        menubar->setGeometry(QRect(0, 0, 800, 28));
+        menubar->setGeometry(QRect(0, 0, 800, 23));
         menuFile = new QMenu(menubar);
         menuFile->setObjectName(QStringLiteral("menuFile"));
         menuView = new QMenu(menubar);
@@ -151,7 +157,8 @@ public:
         menuFile->addAction(actionNew);
         menuFile->addAction(actionQuit);
         menuFile->addSeparator();
-        menuView->addAction(actionOptions);
+        menuView->addAction(actionMinTray);
+        menuView->addAction(actionTrayIcon);
         menuHelo->addAction(actionAbout);
         toolBar->addAction(actionNew);
         toolBar->addAction(actionResume);
@@ -167,7 +174,7 @@ public:
     {
         MainWindow->setWindowTitle(QApplication::translate("MainWindow", "MainWindow", nullptr));
         actionQuit->setText(QApplication::translate("MainWindow", "&Quit", nullptr));
-        actionOptions->setText(QApplication::translate("MainWindow", "&Options", nullptr));
+        actionMinTray->setText(QApplication::translate("MainWindow", "MinimizeToTray", nullptr));
         actionAbout->setText(QApplication::translate("MainWindow", "&About", nullptr));
         actionNew->setText(QApplication::translate("MainWindow", "New", nullptr));
 #ifndef QT_NO_TOOLTIP
@@ -185,8 +192,9 @@ public:
 #ifndef QT_NO_TOOLTIP
         actionDelete->setToolTip(QApplication::translate("MainWindow", "Delete Download", nullptr));
 #endif // QT_NO_TOOLTIP
+        actionTrayIcon->setText(QApplication::translate("MainWindow", "TrayIcon", nullptr));
         menuFile->setTitle(QApplication::translate("MainWindow", "F&ile", nullptr));
-        menuView->setTitle(QApplication::translate("MainWindow", "View", nullptr));
+        menuView->setTitle(QApplication::translate("MainWindow", "Options", nullptr));
         menuHelo->setTitle(QApplication::translate("MainWindow", "He&lp", nullptr));
         toolBar->setWindowTitle(QApplication::translate("MainWindow", "toolBar", nullptr));
 #ifndef QT_NO_TOOLTIP

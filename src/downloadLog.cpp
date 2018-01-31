@@ -20,6 +20,7 @@ void DownloadLog::loadPreviousDownloads(DownloadModel *model) {
 		QString line = file.readLine();
 		QStringList list = line.split(" ");
 
+		if(list.size() < 4) return;
 		#ifdef DEBUG
 			qDebug() << "Loading(log): " << list << endl;
 		#endif
@@ -45,13 +46,14 @@ void DownloadLog::addNewDownload(Download *download) {
 	list.append(download->getFileName());
 	list.append(download->getUrl().toString());
 	list.append(QString::number(download->getFileSize()));
-	list.append(QString::number(download->getState()).append("\n"));
+	list.append(QString::number(download->getState()).append('\n'));
 
 	#ifdef DEBUG
 		qDebug() << "Writing: " << list << endl;
 	#endif
 
 	writeTFile(list, file);
+	file.write("\n");
 }
 
 void DownloadLog::updateLog(QString fName, bool remove) {
@@ -94,7 +96,7 @@ void DownloadLog::openFile(QString fName, QFile &f) {
 
 void DownloadLog::writeTFile(QStringList &list, QFile &f) {
 	QTextStream out(&f);
-	// f.seek(f.size());
+	f.seek(f.size());
 	for(int i = 0; i < list.size(); ++i) {
 		if(i != list.size()-1)
 			out << list.at(i) + " ";

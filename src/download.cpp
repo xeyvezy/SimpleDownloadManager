@@ -126,7 +126,7 @@ void Download::startDownload() {
 }
 
 void Download::pauseDownload() {
-	if(!reply || state == COMPLETED || state == PAUSED) return;
+	if(!reply || state != DOWNLOADING) return;
 	#ifdef DEBUG
 		qDebug() << "Download Paused" << fileName << endl
 		 	<< "Size on disk: " << file.size() << endl;
@@ -138,7 +138,7 @@ void Download::pauseDownload() {
 }
 
 void Download::resumeDownload() {
-	if(state != PAUSED || state == COMPLETED) return;
+	if(state != PAUSED) return;
 	if(file.size() > 0) {
 		#ifdef DEBUG
 			qDebug() << "Download Resumed" << endl
@@ -182,7 +182,9 @@ void Download::getDownloadInfo() {
 		else if(reply->error() != reply->OperationCanceledError)
 			emit downloadInfoComplete(reply->errorString(), reply->error());
 		else {
-			checkFileName();
+			this->fileName = checkFileName(fileName, DefaultDirs::DEFAULT_TEMP);
+			this->fileName = checkFileName(fileName, DefaultDirs::DEFAULT_SAVE);
+			this->file.setFileName(DefaultDirs::DEFAULT_TEMP+fileName);
 			emit downloadInfoComplete(reply->errorString(), 0);
 		}
 	});
@@ -190,23 +192,24 @@ void Download::getDownloadInfo() {
 
 /**
  * check if file name already exists, if so append add a number to make it unique
+ * DefaultDirs::DEFAULT_TEMP
  */
-void Download::checkFileName() {
-	if(fileExists(DefaultDirs::DEFAULT_TEMP+fileName)) {
+QString Download::checkFileName(QString fName, QString dir) {
+	if(fileExists(dir+fName)) {
 		int i = 1;
-		QStringList list = fileName.split(".");
+		QStringList list = fName.split(".");
 		QString name = list.at(0);
 		QString ext;
 		for(int i = 1; i < list.size(); ++i) {
 			ext.append("."+list.at(i));
 		}
-		while(fileExists(DefaultDirs::DEFAULT_TEMP+QString::number(i) + "-" +
+		while(fileExists(dir+QString::number(i) + "-" +
 				name + ext)) {
 			++i;
 		}
-		fileName = QString::number(i)+"-"+fileName;
+		fName = QString::number(i)+"-"+fName;
 	}
-	this->file.setFileName(DefaultDirs::DEFAULT_TEMP+fileName);
+	return fName;
 }
 
 bool Download::fileExists(QString path) {

@@ -74,7 +74,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>28</height>
+     <height>23</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -87,9 +87,10 @@
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>View</string>
+     <string>Options</string>
     </property>
-    <addaction name="actionOptions"/>
+    <addaction name="actionMinTray"/>
+    <addaction name="actionTrayIcon"/>
    </widget>
    <widget class="QMenu" name="menuHelo">
     <property name="title">
@@ -136,13 +137,20 @@
    <addaction name="actionDelete"/>
   </widget>
   <action name="actionQuit">
+   <property name="icon">
+    <iconset resource="../resource/resoure.qrc">
+     <normaloff>:/icons/icons/delete.ico</normaloff>:/icons/icons/delete.ico</iconset>
+   </property>
    <property name="text">
     <string>&amp;Quit</string>
    </property>
   </action>
-  <action name="actionOptions">
+  <action name="actionMinTray">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
-    <string>&amp;Options</string>
+    <string>MinimizeToTray</string>
    </property>
   </action>
   <action name="actionAbout">
@@ -205,6 +213,14 @@
    </property>
    <property name="shortcutVisibleInContextMenu">
     <bool>true</bool>
+   </property>
+  </action>
+  <action name="actionTrayIcon">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>TrayIcon</string>
    </property>
   </action>
  </widget>

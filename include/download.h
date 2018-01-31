@@ -59,7 +59,7 @@ private:
 	//Methods
 	static void initNetworkAccessManager();
 	bool fileExists(QString path);
-	void checkFileName();
+	QString checkFileName(QString name, QString dir);
 	void emitStateChanged() {
 		emit stateChanged(state);
 	}
