@@ -8,7 +8,7 @@
 class DownloadModel : public QAbstractTableModel {
 
 public:
-	static constexpr int COL_CNT = 6;
+	static constexpr int COL_CNT = 7;
 	static const QString HEADERS[COL_CNT];
 	static const QString DEFAULT_TEXT;
 
@@ -17,7 +17,8 @@ public:
 		SPEED = 0x0001,
 		SIZE = 0x0002,
 		STATE = 0x003,
-		ALL = 0x0004
+		ETA = 0x004,
+		ALL = 0x0005
 	};
 
 	DownloadModel(QObject* parent = 0);

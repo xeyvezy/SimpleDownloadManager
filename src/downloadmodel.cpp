@@ -3,7 +3,7 @@
 #include <QMessageBox>
 
 const QString DownloadModel::HEADERS[COL_CNT] = {"Id", "Name", "Progress",
-	"Speed/s", "Size", "State"};
+	"Speed/s", "Eta", "Size", "State"};
 const QString DownloadModel::DEFAULT_TEXT = "Getting Download Info....";
 
 DownloadModel::DownloadModel(QObject* parent):
@@ -37,8 +37,10 @@ QVariant DownloadModel::data(const QModelIndex& index, int role) const {
 				case 3:
 					return QVariant(download->getSpeedString());
 				case 4:
-					return QVariant(download->getFileSizeString());
+					return QVariant(download->getEtaString());
 				case 5:
+					return QVariant(download->getFileSizeString());
+				case 6:
 					return QVariant(download->getStateString());
 			}
 		}
@@ -52,28 +54,10 @@ QVariant DownloadModel::headerData(int section, Qt::Orientation orientation,
 	if(role != Qt::DisplayRole || (orientation != Qt::Orientation::Horizontal))
 		return QVariant();
 
-	switch(section) {
-		case 0:
-			return QVariant(HEADERS[0]);
-		case 1:
-			return QVariant(HEADERS[1]);
-		case 2:
-			return QVariant(HEADERS[2]);
-		case 3:
-			return QVariant(HEADERS[3]);
-		case 4:
-			return QVariant(HEADERS[4]);
-		case 5:
-			return QVariant(HEADERS[5]);
-	}
-	return QVariant();
+	if(section > COL_CNT) return QVariant();
+	else return QVariant(HEADERS[section]);
 }
 
-/**
- * QVariant
- * 0 - progressbar
- * 1 - speed
- */
 bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 	int role) {
 
@@ -84,25 +68,29 @@ bool DownloadModel::setData(const QModelIndex& index, const QVariant& value,
 	QModelIndex index1;
 	QModelIndex index2;
 
+	//progress bar start(index1)=row,2 & end(index2)=row,3 so on..
 	switch(cond) {
 		case PROGRESS:
-			index2 = QAbstractItemModel::createIndex(index.row(), 2);
-			index1 = index2;
+			index1 = QAbstractItemModel::createIndex(index.row(), 2);
+			index2 = QAbstractItemModel::createIndex(index.row(), 3);
 			break;
 		case SPEED:
-			index2 = QAbstractItemModel::createIndex(index.row(), 3);
 			index1 = index2;
-			break;
-		case SIZE:
 			index2 = QAbstractItemModel::createIndex(index.row(), 4);
+			break;
+		case ETA:
 			index1 = index2;
+			index2 = QAbstractItemModel::createIndex(index.row(), 5);
+		case SIZE:
+			index1 = index2;
+			index2 = QAbstractItemModel::createIndex(index.row(), 6);
 			break;
 		case STATE:
-			index2 = QAbstractItemModel::createIndex(index.row(), 5);
 			index1 = index2;
+			index2 = QAbstractItemModel::createIndex(index.row(), 7);
 			break;
 		case ALL:
-			index2 = QAbstractItemModel::createIndex(index.row(), 3);
+			index2 = QAbstractItemModel::createIndex(index.row(), 7);
 			index1 = QAbstractItemModel::createIndex(index.row(), 0);
 			break;
 	}

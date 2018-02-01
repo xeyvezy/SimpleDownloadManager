@@ -7,8 +7,8 @@
 #include <QFile>
 #include <QEventLoop>
 #include <QApplication>
-#include <QElapsedTimer>
 #include <QStorageInfo>
+#include <chrono>
 #include "defaultDirs.h"
 
 // #define DEBUG
@@ -42,14 +42,16 @@ private:
 	//Members
 	int progress;
 	int speed;
+	std::chrono::steady_clock::time_point etime;
+	std::chrono::steady_clock::time_point stime;
 	qint64 lastReceived;
 	qint64 fileSize;
 	qint64 sizeAtPause;
 	QUrl url;
-	QElapsedTimer stime;
 	QString fileName;
 	QString fileSizeString;
 	QString speedString;
+	QString etaString;
 	QFile file;
 	DownloadState state;
 	QNetworkReply* reply;
@@ -61,18 +63,20 @@ private:
 	bool fileExists(QString path);
 	QString checkFileName(QString name, QString dir);
 	void emitStateChanged() {
-		emit stateChanged(state);
+		emit stateChanged();
 	}
+	QString calcEta();
 	QString convertSizeTString(qint64 size);
 
 
 signals:
 	void downloadError(QString message);
 	void downloadInfoComplete(QString message, bool error);
-	void fileSizeUpdate(qint64 size);
-	void progressUpdate(int percent);
-	void stateChanged(DownloadState state);
-	void downloadSpeed(int speed);
+	void fileSizeUpdate();
+	void progressUpdate();
+	void stateChanged();
+	void downloadSpeed();
+	void downloadEta();
 
 	//Getters
 public:
@@ -103,15 +107,15 @@ public:
 	QString getStateString() const {
 		switch(state) {
 			case DOWNLOADING:
-				return QString("DOWNLOADING");
+				return QString("Downloading");
 			case COMPLETED:
-				return QString("COMPLETED");
+				return QString("Completed");
 			case PAUSED:
-				return QString("PAUSED");
+				return QString("Paused");
 			case FAILED:
-				return QString("FAILED");
+				return QString("Failed");
 			default:
-				return QString("NOTHING");
+				return QString(".....");
 		}
 	}
 
@@ -121,5 +125,9 @@ public:
 
 	QString getSpeedString() const {
 		return speedString;
+	}
+
+	QString getEtaString() const {
+		return etaString;
 	}
 };

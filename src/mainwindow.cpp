@@ -240,6 +240,10 @@ void MainWindow::connectSignals(Download *download) {
 	connect(download, &Download::downloadSpeed, this, [=]{
 		updateModel(download, DownloadModel::SPEED);
 	});
+	//update eta
+	connect(download, &Download::downloadEta, this, [=]{
+		updateModel(download, DownloadModel::ETA);
+	});
 	//update size if updateDownloadInfo fails
 	connect(download, &Download::fileSizeUpdate, this, [=]{
 		updateModel(download, DownloadModel::SIZE);
@@ -254,6 +258,7 @@ void MainWindow::connectSignals(Download *download) {
 			QDir dir;
 			dir.rename(download->getFilePath(),
 				DefaultDirs::DEFAULT_SAVE+download->getFileName());
+			download->disconnect();
 		}
 	});
 	//errors while downloading
@@ -301,7 +306,7 @@ void MainWindow::deleteDownload() {
 				deleteFile(download->getFileName(), file);
 			}
 	} else {
-		if(stateBefore != Download::PAUSED);
+		if(stateBefore != Download::PAUSED)
 			download->resumeDownload();
 	}
 }

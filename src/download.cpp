@@ -1,8 +1,10 @@
 #include "download.h"
 #include <QDebug>
 #include <QFileInfo>
+#include <QDateTime>
 
 QNetworkAccessManager* Download::manager = Q_NULLPTR;
+using namespace std::chrono;
 
 Download::Download(QUrl url, QObject* parent):
 		QObject(parent) {
@@ -20,7 +22,8 @@ Download::Download(QUrl url, QObject* parent):
 	this->state = NOTHING;
 	this->reply = Q_NULLPTR;
 	this->request = QNetworkRequest(this->url);
-	this->stime.start();
+	this->etime = steady_clock::time_point(seconds(0));
+	this->stime = steady_clock::time_point(seconds(0));
 	//Redirect
 	request.setAttribute(QNetworkRequest::FollowRedirectsAttribute,
 		QVariant("MyRequest"));
@@ -76,21 +79,29 @@ void Download::startDownload() {
 		if(bytesTotal > 0 && fileSize < 0) {
 			fileSize = bytesTotal;
 			fileSizeString = convertSizeTString(fileSize);
-			emit fileSizeUpdate(fileSize);
+			emit fileSizeUpdate();
 		}
 		if(bytesReceived > 0) {
 			int curProgress = ((bytesReceived+sizeAtPause)*100) /
 				(bytesTotal+sizeAtPause);
 			if((curProgress-progress) > 0) {
 				progress = curProgress;
-				emit progressUpdate(progress);
+				emit progressUpdate();
 			}
-			if(stime.elapsed() > 1000) {
+
+			if((duration_cast<duration<int,std::ratio<1,1000>>>(steady_clock::now()-
+					stime)).count() > 1000) {
 				speed = bytesReceived - lastReceived;
 				lastReceived = bytesReceived;
 				speedString = convertSizeTString(speed);
-				emit downloadSpeed(speed);
-				stime.restart();
+				emit downloadSpeed();
+				stime = std::chrono::steady_clock::now();
+			}
+			if((duration_cast<duration<int,std::ratio<1,1000>>>(steady_clock::now()-
+					etime)).count() > 500) {
+				etaString = calcEta();
+				emit downloadEta();
+				etime = std::chrono::steady_clock::now();
 			}
 			// #ifdef DEBUG
 			// 	qDebug() << "Progress: " << progress << endl
@@ -115,13 +126,15 @@ void Download::startDownload() {
 			#endif
 			state = COMPLETED;
 		}
-
-		speedString = "";
-		emit downloadSpeed(0);
-		emitStateChanged();
 		file.close();
 		reply->deleteLater();
 		reply = Q_NULLPTR;
+		emitStateChanged();
+
+		speedString = "";
+		etaString = "";
+		emit downloadEta();
+		emit downloadSpeed();
 	});
 }
 
@@ -246,4 +259,22 @@ QString Download::convertSizeTString(qint64 size) {
 		default:
 			return QString::number(fsize,'f',2)+"TB";
 	}
+}
+
+QString Download::calcEta() {
+	float secd = (1/(float)speed)*(float)fileSize;
+	QString res;
+	int secs = (int)secd % 60;
+	secd /= 60;
+	int mins = (int)secd % 60;
+	secd /= 60;
+	int hors = (int)secd % 24;
+	secd /= 24;
+	int days = secd;
+
+	if(!hors && !days)
+		return res.sprintf("%02dm:%02ds", mins, secs);
+	else if(!days)
+		return res.sprintf("%02dh:%02dm", hors, mins);
+	return res.sprintf("%02d:%02dh", days, hors);
 }

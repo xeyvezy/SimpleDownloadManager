@@ -39,6 +39,8 @@ void DownloadLog::loadPreviousDownloads(DownloadModel *model) {
 			state, model);
 		model->addNewDownload(download);
 	}
+	QTextStream out(&file);
+	out << "\n";
 }
 
 void DownloadLog::addNewDownload(Download *download) {
@@ -46,14 +48,14 @@ void DownloadLog::addNewDownload(Download *download) {
 	list.append(download->getFileName());
 	list.append(download->getUrl().toString());
 	list.append(QString::number(download->getFileSize()));
-	list.append(QString::number(download->getState()).append('\n'));
+	list.append(QString::number(download->getState()));
+	list.append(QString('\n'));
 
 	#ifdef DEBUG
 		qDebug() << "Writing: " << list << endl;
 	#endif
 
 	writeTFile(list, file);
-	file.write("\n");
 }
 
 void DownloadLog::updateLog(QString fName, bool remove) {
