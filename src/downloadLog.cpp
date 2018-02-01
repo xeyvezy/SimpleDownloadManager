@@ -58,7 +58,7 @@ void DownloadLog::addNewDownload(Download *download) {
 	writeTFile(list, file);
 }
 
-void DownloadLog::updateLog(QString fName, bool remove) {
+void DownloadLog::updateLog(Download *download, LogUpdate update) {
 	QFile newFile;
 	openFile(this->fileName+"-tmp", newFile);
 
@@ -71,10 +71,18 @@ void DownloadLog::updateLog(QString fName, bool remove) {
 			continue;
 
 		QString name = list.at(0);
-		if(name == fName) {
-			if(remove) continue;
-			else
-				list[3] = QString::number(Download::COMPLETED);
+		if(name == download->getFileName()) {
+			switch(update) {
+				case REMOVE:
+					continue;
+				case STATE:
+					list[3] = QString::number(download->getState());
+					break;
+				case FSIZE:
+					list[2] =  QString::number(download->getFileSize());
+				default:
+					break;
+			}
 		}
 		#ifdef DEBUG
 			qDebug() << "Copying to temp: " << list << endl;

@@ -88,7 +88,7 @@ MainWindow::MainWindow(QWidget* parent):
 	model = new DownloadModel(this);
 	pmodel = new QSortFilterProxyModel(this);
 	pmodel->setSourceModel(model);
-	pmodel->setFilterKeyColumn(5);
+	pmodel->setFilterKeyColumn(6);
 
 	//Load previous downloads and connect if not completed
 	downloadLog.loadPreviousDownloads(model);
@@ -111,13 +111,13 @@ MainWindow::MainWindow(QWidget* parent):
 				pmodel->setFilterFixedString("");
 				return;
 			case 1:
-				pmodel->setFilterFixedString("DOWNLOADING");
+				pmodel->setFilterFixedString("Downloading");
 				return;
 			case 2:
-				pmodel->setFilterFixedString("PAUSED");
+				pmodel->setFilterFixedString("Paused");
 				return;
 			case 3:
-				pmodel->setFilterFixedString("COMPLETED");
+				pmodel->setFilterFixedString("Completed");
 				return;
 			default:
 				return;
@@ -247,13 +247,14 @@ void MainWindow::connectSignals(Download *download) {
 	//update size if updateDownloadInfo fails
 	connect(download, &Download::fileSizeUpdate, this, [=]{
 		updateModel(download, DownloadModel::SIZE);
+		downloadLog.updateLog(download, DownloadLog::FSIZE);
 	});
 	//update download state
 	connect(download, &Download::stateChanged, this, [=]{
 		updateModel(download, DownloadModel::STATE);
 		//On completion
 		if(download->getState() == Download::COMPLETED){
-			downloadLog.updateLog(download->getFileName(), false);
+			downloadLog.updateLog(download, DownloadLog::STATE);
 			//Move file
 			QDir dir;
 			dir.rename(download->getFilePath(),
@@ -298,28 +299,25 @@ void MainWindow::deleteDownload() {
 		download->deleteLater();
 		QFile file(download->getFilePath());
 		if(state == Download::COMPLETED)
-			if(!cbox.isChecked())
-				downloadLog.updateLog(download->getFileName(), true);
-			else {
-				file.setFileName(DefaultDirs::DEFAULT_SAVE+
-					download->getFileName());
-				deleteFile(download->getFileName(), file);
-			}
+			file.setFileName(DefaultDirs::DEFAULT_SAVE + download->getFileName());
+		else cbox.setChecked(true); //always delete if incomplete download
+		deleteFile(download, file, cbox.isChecked());
 	} else {
 		if(stateBefore != Download::PAUSED)
 			download->resumeDownload();
 	}
 }
 
-void MainWindow::deleteFile(QString fileName, QFile &file) {
+void MainWindow::deleteFile(Download *download, QFile &file, bool checked) {
 	if(file.exists()) {
-		if(!file.remove()) qDebug() << "Failed To Delete: "
-			<< file.fileName();
+		if(checked)
+			if(!file.remove())
+				qDebug() << "Failed To Delete: " << file.fileName();
 	} else {
 		QMessageBox::warning(this, "File Not Found!",
 			"File was already deleted!");
 	}
-	downloadLog.updateLog(fileName, true);
+	downloadLog.updateLog(download, DownloadLog::REMOVE);
 }
 
 bool MainWindow::updateModel(Download* download,
@@ -423,10 +421,11 @@ void MainWindow::closeEvent(QCloseEvent *e) {
 		QMessageBox::question( this, "Simple Download Manager",
             tr("Do you want to quit?"), QMessageBox::No | QMessageBox::Yes,
         	QMessageBox::Yes);
-    if (res != QMessageBox::Yes) {
-        e->ignore();
+    if(res != QMessageBox::Yes) {
+		e->ignore();
     } else {
-        e->accept();
+      e->accept();
+		ui->actionQuit->trigger();
     }
 }
 
@@ -440,5 +439,4 @@ void MainWindow::changeEvent(QEvent *e) {
 			this->showAction->setEnabled(false);
 		}
 	}
-	QMainWindow::changeEvent(e);
 }

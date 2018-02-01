@@ -34,7 +34,7 @@ private:
 	//calls setData
 	bool updateModel(Download* download,
 		DownloadModel::UPDATE_FIELD field) const;
-	void deleteFile(QString fileName, QFile &file);
+	void deleteFile(Download *download, QFile &file, bool checked);
 	void setupTableView();
 	void setupListView();
 	void setupTrayIcon();

@@ -88,9 +88,8 @@ void Download::startDownload() {
 				progress = curProgress;
 				emit progressUpdate();
 			}
-
 			if((duration_cast<duration<int,std::ratio<1,1000>>>(steady_clock::now()-
-					stime)).count() > 1000) {
+					stime)).count() >= 1000) {
 				speed = bytesReceived - lastReceived;
 				lastReceived = bytesReceived;
 				speedString = convertSizeTString(speed);
@@ -98,7 +97,7 @@ void Download::startDownload() {
 				stime = std::chrono::steady_clock::now();
 			}
 			if((duration_cast<duration<int,std::ratio<1,1000>>>(steady_clock::now()-
-					etime)).count() > 500) {
+					etime)).count() >= 500) {
 				etaString = calcEta();
 				emit downloadEta();
 				etime = std::chrono::steady_clock::now();
@@ -262,7 +261,7 @@ QString Download::convertSizeTString(qint64 size) {
 }
 
 QString Download::calcEta() {
-	float secd = (1/(float)speed)*(float)fileSize;
+	double secd = (1/(double)speed)*(double)(fileSize-file.size());
 	QString res;
 	int secs = (int)secd % 60;
 	secd /= 60;
@@ -272,7 +271,9 @@ QString Download::calcEta() {
 	secd /= 24;
 	int days = secd;
 
-	if(!hors && !days)
+	if(!hors && !days && !mins)
+		return res.sprintf("%02ds", secs);
+	else if(!hors && !days)
 		return res.sprintf("%02dm:%02ds", mins, secs);
 	else if(!days)
 		return res.sprintf("%02dh:%02dm", hors, mins);

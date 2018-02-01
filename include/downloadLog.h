@@ -7,6 +7,11 @@
 class DownloadLog {
 
 public:
+	enum LogUpdate {
+		REMOVE = 0x0000,
+		STATE = 0x0001,
+		FSIZE = 0x0002
+	};
 	DownloadLog();
 	~DownloadLog();
 
@@ -16,7 +21,7 @@ public:
 	 * if remove is true delete the fileName entry from log
 	 * if remove is false update the status of fileName entry
 	 */
-	void updateLog(QString fName, bool remove);
+	void updateLog(Download *download, LogUpdate update);
 
 private:
 	QFile file;
